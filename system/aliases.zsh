@@ -4,7 +4,9 @@
 
 alias dev="cd ~/dev"
 alias cat="bat"
-alias zshrc="nvim ~/.dotfiles/.zshrc"
+alias zshrc="nvim ~/.dotfiles/apps/zsh/.zshrc"
+alias df 'cd ~/.dotfiles/ && nvim'
+alias gc 'gitmoji -c'
 
 # Whenever I forget one of many zsh aliases
 alias alz="alias | fzf"
@@ -19,3 +21,4 @@ alias lsh="ls -ld .?*"
 alias ls="exa"
 # List everythinh
 alias la="exa -la"
+

@@ -10,17 +10,18 @@ echo "Setting up..."
 sudo -v
 
 # Keep-alive: update existing `sudo` time stamp until `.install` has finished
-while true
+while true; do
   sudo -n true
   sleep 60
-  kill -0 "$fish_pid" || exit
-end 2>/dev/null &
-
+  kill -0 "$$" || exit
+done 2>/dev/null &
 ###############################################################################
 # Install                                                                     #
 ###############################################################################
 
-source ~/.dotfiles/apps/starship/install.sh
+source ~/.dotfiles/installers/pacman.sh
+source ~/.dotfiles/installers/yay.sh
+source ~/.dotfiles/installers/pnpm.sh
 
 ###############################################################################
 # Symlinks                                                                    #
