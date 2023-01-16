@@ -1,19 +1,21 @@
 #!/bin/sh
 
 ###############################################################################
-# yay                                                                         #
+# apt                                                                         #
 ###############################################################################
 
-yay -S \
+sudo apt update && sudo apt upgrade && sudo apt install \
+  nodejs \
+  npm \
+  fd-find \
+  ripgrep \
+  neovim \
   neofetch \
   fzf \
-  neovim \
   bat \
   exa \
   curl \
   wget \
-  nvm \
-  yarn \
-  python \
-  python-pip \
-  --noconfirm
+  python3 \
+  python3-pip \
+  zsh

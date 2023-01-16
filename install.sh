@@ -19,9 +19,7 @@ done 2>/dev/null &
 # Install                                                                     #
 ###############################################################################
 
-source ~/.dotfiles/installers/pacman.sh
-source ~/.dotfiles/installers/yay.sh
-source ~/.dotfiles/installers/pnpm.sh
+source ~/.dotfiles/installers/apt.sh
 
 ###############################################################################
 # Symlinks                                                                    #
