@@ -38,3 +38,8 @@ plugins=(
 export PNPM_HOME="/home/redfoxd/.local/share/pnpm"
 export PATH="$PNPM_HOME:$PATH"
 # pnpm end
+
+# virtualenv
+export VIRTUALENV_HOME="/home/redfoxd/.local/bin"
+export PATH="$VIRTUALENV_HOME:$PATH"
+# virtualenv end
