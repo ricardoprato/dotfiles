@@ -43,3 +43,13 @@ export PATH="$PNPM_HOME:$PATH"
 export VIRTUALENV_HOME="/home/redfoxd/.local/bin"
 export PATH="$VIRTUALENV_HOME:$PATH"
 # virtualenv end
+
+# fnm
+export PATH=/home/$USER/.fnm:$PATH
+eval "$(fnm env --use-on-cd --version-file-strategy=recursive)"
+# fnm end
+
+# deno
+export DENO_INSTALL="/home/redfoxd/.deno"
+export PATH="$DENO_INSTALL/bin:$PATH"
+# deno end
