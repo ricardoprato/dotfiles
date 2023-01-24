@@ -5,8 +5,6 @@
 ###############################################################################
 
 sudo apt update && sudo apt upgrade && sudo apt install \
-  nodejs \
-  npm \
   fd-find \
   ripgrep \
   neovim \
@@ -18,4 +16,5 @@ sudo apt update && sudo apt upgrade && sudo apt install \
   wget \
   python3 \
   python3-pip \
-  zsh
+  zsh \
+  unzip

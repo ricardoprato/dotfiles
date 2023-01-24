@@ -20,6 +20,12 @@ done 2>/dev/null &
 ###############################################################################
 
 source ~/.dotfiles/installers/apt.sh
+source ~/.dotfiles/installers/node.sh
+source ~/.dotfiles/installers/omz.sh
+source ~/.dotfiles/installers/npm.sh
+source ~/.dotfiles/installers/pnpm.sh
+source ~/.dotfiles/installers/deno.sh
+source ~/.dotfiles/installers/antigen.sh
 
 ###############################################################################
 # Symlinks                                                                    #

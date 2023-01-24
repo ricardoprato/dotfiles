@@ -22,3 +22,5 @@ alias ls="exa"
 # List everythinh
 alias la="exa -la"
 
+alias python=python3
+alias pip=pip3

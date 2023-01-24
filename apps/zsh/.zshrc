@@ -5,7 +5,11 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
+typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
+
 export ZSH=$HOME/.oh-my-zsh
+export EDITOR='nvim';
+export DISPLAY=:0
 
 # Load antigen
 . $HOME/.dotfiles/apps/antigen/init.zsh
@@ -39,7 +43,22 @@ export PNPM_HOME="/home/redfoxd/.local/share/pnpm"
 export PATH="$PNPM_HOME:$PATH"
 # pnpm end
 
-# virtualenv
+# python3
+export PYTHON="/usr/bin/python3"
+export PATH="$PYTHON:$PATH"
+# python3 end
+
+# virtualentypeset -g POWERLEVEL9K_INSTANT_PROMPT=quietv
 export VIRTUALENV_HOME="/home/redfoxd/.local/bin"
 export PATH="$VIRTUALENV_HOME:$PATH"
 # virtualenv end
+
+# fnm
+export PATH=/home/$USER/.fnm:$PATH
+eval "$(fnm env --use-on-cd --version-file-strategy=recursive)"
+# fnm end
+
+# deno
+export DENO_INSTALL="/home/redfoxd/.deno"
+export PATH="$DENO_INSTALL/bin:$PATH"
+# deno end
