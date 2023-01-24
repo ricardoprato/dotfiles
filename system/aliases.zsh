@@ -3,7 +3,7 @@
 ###############################################################################
 
 alias dev="cd ~/dev"
-alias cat="bat"
+alias cat="batcat"
 alias zshrc="nvim ~/.dotfiles/apps/zsh/.zshrc"
 alias df='cd ~/.dotfiles/ && nvim'
 alias gc='gitmoji -c'
