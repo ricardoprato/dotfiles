@@ -21,4 +21,5 @@ alias lsh="ls -ld .?*"
 alias ls="exa"
 # List everythinh
 alias la="exa -la"
-
+alias ll="exa -l -g --icons --git"
+alias llt="exa -1 --icons --tree --git-ignore"

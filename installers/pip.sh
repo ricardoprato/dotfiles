@@ -1,1 +1,1 @@
-pip install pynvim --upgrade
+pip install pynvim virtualenv autopep8 --upgrade
