@@ -16,4 +16,6 @@ yay -S \
   yarn \
   python \
   python-pip \
+  lazydocker \
+  lazygit \
   --noconfirm

@@ -2,7 +2,8 @@
 # apps                                                                        #
 ###############################################################################
 
-ln -sf $HOME/.dotfiles/apps/nvim/ $HOME/.config
+ln -sf $HOME/.dotfiles/apps/nvim $HOME/.config
+ln -sf $HOME/.dotfiles/apps/zellij $HOME/.config
 ln -sf $HOME/.dotfiles/apps/htop $HOME/.config
 
 ###############################################################################

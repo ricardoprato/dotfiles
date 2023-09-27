@@ -5,7 +5,6 @@
 alias dev="cd ~/dev"
 alias cat="bat"
 alias zshrc="nvim ~/.dotfiles/apps/zsh/.zshrc"
-alias df='cd ~/.dotfiles/ && nvim'
 alias gc='gitmoji -c'
 
 # Whenever I forget one of many zsh aliases
@@ -23,3 +22,5 @@ alias ls="exa"
 alias la="exa -la"
 alias ll="exa -l -g --icons --git"
 alias llt="exa -1 --icons --tree --git-ignore"
+# lazydokcer
+alias lzd="lazydokcer"
