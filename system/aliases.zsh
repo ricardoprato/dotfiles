@@ -5,7 +5,6 @@
 alias dev="cd ~/dev"
 alias cat="bat"
 alias zshrc="nvim ~/.dotfiles/apps/zsh/.zshrc"
-alias gc='gitmoji -c'
 
 # Whenever I forget one of many zsh aliases
 alias alz="alias | fzf"
