@@ -1,0 +1,3 @@
+[submodule "configs/dot-config/nvim"]
+	path = configs/dot-config/nvim
+	url = git@github.com:ricardoprato/kickstart.nvim.git
