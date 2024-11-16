@@ -1,0 +1,5 @@
+require("options")
+require("keymappings")
+require("commands")
+require("Lazy")
+require("autocommands")
