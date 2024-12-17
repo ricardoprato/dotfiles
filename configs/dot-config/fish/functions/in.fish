@@ -1,3 +1,10 @@
+# Detect the AUR wrapper
+if pacman -Qi yay >/dev/null 2>&1
+    set aurhelper "yay"
+else if pacman -Qi paru >/dev/null 2>&1
+    set aurhelper "paru"
+end
+
 function in
     set pkg $argv[1]
 

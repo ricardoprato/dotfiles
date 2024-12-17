@@ -47,3 +47,4 @@ SETUVAR fish_pager_color_selected_background:\x1d
 SETUVAR fish_pager_color_selected_completion:\x1d
 SETUVAR fish_pager_color_selected_description:\x1d
 SETUVAR fish_pager_color_selected_prefix:\x1d
+SETUVAR --export fish_user_paths:/home/redfoxd/\x2edeno/bin\x1e/var/lib/flatpak/exports/bin\x1e/home/redfoxd/\x2elocal/share/pnpm\x1e/usr/local/sbin\x1e/home/redfoxd/\x2elocal/bin\x1e/home/redfoxd/\x2ecargo/bin\x1e/bin
