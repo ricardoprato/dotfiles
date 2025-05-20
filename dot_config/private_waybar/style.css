@@ -1,0 +1,332 @@
+/* =============================================================================
+ *
+ * Waybar configuration
+ *
+ * Configuration reference: https://github.com/Alexays/Waybar/wiki/Configuration
+ *
+ * =========================================================================== */
+
+/* -----------------------------------------------------------------------------
+ * Keyframes
+ * -------------------------------------------------------------------------- */
+
+@import "colors.css";
+
+
+/* -----------------------------------------------------------------------------
+  * Base styles
+  * -------------------------------------------------------------------------- */
+
+/* Reset all styles */
+
+* {
+    color: @lavender;
+    border: none;
+    border-radius: 0px;
+    font-family: "JetBrainsMono Nerd Font";
+    font-weight: bold;
+    font-size: 12px;
+    min-height: 10px;
+}
+
+window#waybar {
+    border: 0px solid rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0);
+}
+
+#workspaces button {
+    box-shadow: none;
+    text-shadow: none;
+    padding: 0px;
+    border-radius: 8px;
+    padding-left: 3px;
+    padding-right: 3px;
+    animation: ws_normal 20s ease-in-out 1;
+}
+
+#workspaces button.active {
+    background: @mantle;
+    padding-left: 11px;
+    padding-right: 11px;
+    animation: ws_active 20s ease-in-out 1;
+    transition: all 0.4s cubic-bezier(.55, -0.68, .48, 1.682);
+}
+
+#workspaces button:hover {
+    color: @mauve;
+    box-shadow: none;
+    /* Remove predefined box-shadow */
+    text-shadow: none;
+    /* Remove predefined text-shadow */
+    border: 0px;
+    background: none;
+}
+
+#workspaces button:hover * {
+    color: @mauve;
+}
+
+#workspaces * {
+    color: whitesmoke;
+}
+
+#workspaces {
+    background-color: @base;
+    opacity: 1;
+    margin: 8px 0px 8px 8px;
+    padding: 0px 10px;
+}
+
+#workspaces button.focused {
+    color: @mauve;
+    border-radius: 20px;
+    /* background-color: @flamingo; */
+}
+
+#workspaces button.focused * {
+    color: @mauve;
+}
+
+#mode {
+    color: #ebcb8b;
+}
+
+#clock,
+#custom-cava-internal,
+#battery,
+#cpu,
+#memory,
+#disk,
+#idle_inhibitor,
+#temperature,
+#custom-keyboard-layout,
+#backlight,
+#privacy,
+#network,
+#pulseaudio,
+#mode,
+#window,
+#tray,
+#custom-power,
+#custom-pacman,
+#custom-launcher,
+#custom-system,
+#mpd {
+    padding: 5px 8px;
+    background-color: shade(@base, 1);
+    opacity: 1;
+    margin: 8px 0;
+}
+
+#window {
+    color: @base;
+    margin-left: 5px;
+    margin-right: 5px;
+    background-color: @mauve;
+}
+
+window#waybar.empty #window {
+    background-color: transparent;
+}
+
+#custom-cava-internal {
+    border-radius: 10px;
+    color: @mauve;
+}
+
+#clock {
+    color: @sky;
+    margin: 8px 10px;
+}
+
+#backlight {
+    color: @yellow;
+}
+
+#battery {
+    color: @green;
+    margin-right: 10px;
+}
+
+#battery.charging {
+    color: #81a1c1;
+}
+
+@keyframes blink {
+    to {
+        color: @red;
+        /* border-bottom: 2px solid @red; */
+    }
+}
+
+#battery.warning:not(.charging) {
+    color: @yellow;
+    /* border-bottom: 2px solid #81a1c1; */
+}
+
+
+#battery.critical:not(.charging) {
+    color: #bf616a;
+    /* border-bottom: 2px solid #bf616a; */
+    animation-name: blink;
+    animation-duration: 0.5s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+
+#custom-system {
+    color: @sky;
+    /* border-bottom: 2px solid @sky; */
+}
+
+#cpu {
+    color: @sky;
+    /* border-bottom: 2px solid @sky; */
+}
+
+#cpu #cpu-icon {
+    color: @sky;
+}
+
+#memory {
+    color: @sky;
+}
+
+#disk {
+    color: @sky;
+}
+
+#network.disabled {
+    color: #bf616a;
+}
+
+#network {
+    color: @green;
+    margin-right: 5px;
+}
+
+#network.disconnected {
+    color: #bf616a;
+}
+
+#pulseaudio {
+    color: @flamingo;
+}
+
+#pulseaudio.muted {
+    color: #3b4252;
+}
+
+#temperature {
+    color: @teal;
+}
+
+#temperature.critical {
+    color: @red;
+    /* border-bottom: 2px solid @red; */
+}
+
+#idle_inhibitor {
+    color: #ebcb8b;
+}
+
+#custom-launcher {
+    background-color: @mauve;
+    color: @base;
+    padding: 5px 10px;
+}
+
+#custom-power {
+    color: @red;
+    padding: 5px 10px;
+}
+
+#custom-keyboard-layout {
+    color: @peach;
+    margin-right: 10px;
+}
+
+#backlight,
+#battery,
+#bluetooth,
+#custom-cava,
+#custom-cliphist,
+#clock,
+#custom-cpuinfo,
+#cpu,
+#custom-github_hyprdots,
+#custom-gpuinfo,
+#idle_inhibitor,
+#custom-keybindhint,
+#language,
+#memory,
+#mpris,
+#network,
+#custom-notifications,
+#custom-power,
+#privacy,
+#custom-system,
+#pulseaudio,
+#custom-spotify,
+#taskbar,
+#custom-theme,
+#tray,
+#custom-updates,
+#custom-wallchange,
+#custom-wbar,
+#window,
+#workspaces,
+#custom-l_end,
+#custom-r_end,
+#custom-sl_end,
+#custom-sr_end,
+#custom-rl_end,
+#custom-rr_end {
+    background-color: @base;
+    opacity: 1;
+    margin: 4px 0px 4px 0px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+#workspaces,
+#taskbar {
+    padding: 0px;
+}
+
+#custom-r_end {
+    border-radius: 0px 20px 20px 0px;
+    margin-right: 8px;
+    padding-right: 0px;
+}
+
+#custom-l_end {
+    border-radius: 20px 0px 0px 20px;
+    margin-left: 8px;
+    padding-left: 0px;
+}
+
+#custom-sr_end {
+    border-radius: 0px;
+    margin-right: 8px;
+    padding-right: 0px;
+}
+
+#custom-sl_end {
+    border-radius: 0px;
+    margin-left: 8px;
+    padding-left: 0px;
+}
+
+#custom-rr_end {
+    border-radius: 0px 7px 7px 0px;
+    margin-right: 8px;
+    padding-right: 0px;
+}
+
+#custom-rl_end {
+    border-radius: 7px 0px 0px 7px;
+    margin-left: 8px;
+    padding-left: 0px;
+}

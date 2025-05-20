@@ -1,0 +1,43 @@
+{
+  "layer": "top", // Waybar at top layer
+  "position": "top", // Waybar position (top|bottom|left|right)
+  "height": 29,
+  "gtk-layer-shell": true,
+  "reload_style_on_change": true,
+  "margin": "0 0 0 0",
+  // Choose the order of the modules idle_inhibitor
+  "modules-left": [
+    "custom/l_end",
+    "hyprland/workspaces",
+    "custom/r_end",
+    "custom/l_end",
+    "tray",
+    "custom/cava-internal",
+    "custom/r_end",
+  ],
+  "modules-center": [
+    "custom/l_end",
+    "mpris",
+    "clock",
+    "custom/r_end",
+  ],
+  "modules-right": [
+    "custom/padd",
+    "custom/l_end",
+    "backlight",
+    "pulseaudio",
+    "temperature",
+    "group/hardware",
+    "privacy",
+    "battery",
+    "network",
+    "idle_inhibitor",
+    "custom/power",
+    "custom/r_end",
+  ],
+  // Load Modules
+  "include": [
+    "~/.config/waybar/modules.jsonc"
+  ],
+  // Modules configuration
+}
