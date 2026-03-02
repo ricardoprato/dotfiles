@@ -3,6 +3,8 @@ set -g fish_greeting
 if status is-interactive
     starship init fish | source
     atuin init fish | source
+    pyenv init - fish | source
+    eval "$(direnv hook fish)"
 end
 
 # List Directory
@@ -22,3 +24,14 @@ abbr .5 'cd ../../../../..'
 
 # Always mkdir a path (this doesn't inhibit functionality to make a single dir)
 abbr mkdir 'mkdir -p'
+
+# pnpm
+set -gx PNPM_HOME "/home/redfoxd/.local/share/pnpm"
+if not string match -q -- $PNPM_HOME $PATH
+    set -gx PATH "$PNPM_HOME" $PATH
+end
+# pnpm end
+
+# bun
+set --export BUN_INSTALL "$HOME/.bun"
+set --export PATH $BUN_INSTALL/bin $PATH

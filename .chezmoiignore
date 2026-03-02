@@ -1,0 +1,9 @@
+# Infrastructure files (reference only, not deployed to home)
+bootstrap.sh
+update-pkgs.sh
+pkgs-pacman.txt
+pkgs-aur.txt
+system
+system/**
+LICENSE
+README*

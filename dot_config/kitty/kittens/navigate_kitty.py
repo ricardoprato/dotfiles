@@ -1,6 +1,8 @@
-from kittens.tui.handler import result_handler
 from typing import List
+
 from kitty.boss import Boss
+
+from kittens.tui.handler import result_handler
 
 
 def main():

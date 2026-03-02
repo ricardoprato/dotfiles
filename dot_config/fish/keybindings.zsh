@@ -1,3 +1,3 @@
-bindkey -v
-
-export KEYTIMEOUT=1
+# bindkey -v
+#
+# export KEYTIMEOUT=1

@@ -1,0 +1,7 @@
+[user]
+	email = ricardoprato36@gmail.com
+	name = Ricardo Prato
+[core]
+	editor = nvim
+[push]
+	autoSetupRemote = true

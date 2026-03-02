@@ -34,40 +34,43 @@ window#waybar {
     background-color: rgba(0, 0, 0, 0);
 }
 
-#workspaces button {
+/* Pacman-themed workspaces */
+#workspaces button,
+#workspaces button label {
     box-shadow: none;
     text-shadow: none;
     padding: 0px;
     border-radius: 8px;
-    padding-left: 3px;
-    padding-right: 3px;
-    animation: ws_normal 20s ease-in-out 1;
+    padding-left: 4px;
+    padding-right: 4px;
+    color: #74c7ec; /* Ghost blue - Sapphire */
+    font-size: 14px;
+    transition: all 0.08s ease-out;
 }
 
-#workspaces button.active {
+#workspaces button.empty,
+#workspaces button.empty label {
+    color: #6e738d; /* Dot gray */
+    font-size: 10px;
+}
+
+#workspaces button.active,
+#workspaces button.active label {
     background: @mantle;
-    padding-left: 11px;
-    padding-right: 11px;
-    animation: ws_active 20s ease-in-out 1;
-    transition: all 0.4s cubic-bezier(.55, -0.68, .48, 1.682);
+    color: #f9e2af; /* Pacman yellow */
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: 18px;
+    transition: all 0.08s ease-out;
 }
 
-#workspaces button:hover {
-    color: @mauve;
+#workspaces button:hover,
+#workspaces button:hover label {
+    color: #f38ba8; /* Pink ghost on hover */
     box-shadow: none;
-    /* Remove predefined box-shadow */
     text-shadow: none;
-    /* Remove predefined text-shadow */
     border: 0px;
     background: none;
-}
-
-#workspaces button:hover * {
-    color: @mauve;
-}
-
-#workspaces * {
-    color: whitesmoke;
 }
 
 #workspaces {
@@ -77,15 +80,7 @@ window#waybar {
     padding: 0px 10px;
 }
 
-#workspaces button.focused {
-    color: @mauve;
-    border-radius: 20px;
-    /* background-color: @flamingo; */
-}
-
-#workspaces button.focused * {
-    color: @mauve;
-}
+/* focused handled by active */
 
 #mode {
     color: #ebcb8b;
@@ -210,6 +205,19 @@ window#waybar.empty #window {
     color: #bf616a;
 }
 
+/* Bluetooth */
+#bluetooth {
+    color: @blue;
+}
+
+#bluetooth.disabled {
+    color: @overlay0;
+}
+
+#bluetooth.connected {
+    color: @sapphire;
+}
+
 #pulseaudio {
     color: @flamingo;
 }
@@ -229,6 +237,46 @@ window#waybar.empty #window {
 
 #idle_inhibitor {
     color: #ebcb8b;
+}
+
+/* Updates indicator */
+#custom-updates {
+    color: @yellow;
+    padding: 5px 8px;
+    background-color: @base;
+    margin: 4px 0px;
+}
+
+#custom-updates.updated {
+    color: @green;
+}
+
+#custom-updates.updates-available {
+    color: @peach;
+}
+
+/* Do Not Disturb */
+#custom-dnd {
+    color: @green;
+    padding: 5px 8px;
+    background-color: @base;
+    margin: 4px 0px;
+}
+
+#custom-dnd.paused {
+    color: @red;
+}
+
+/* Gaming Mode */
+#custom-gamemode {
+    color: @overlay0;
+    padding: 5px 8px;
+    background-color: @base;
+    margin: 4px 0px;
+}
+
+#custom-gamemode.gaming-on {
+    color: @green;
 }
 
 #custom-launcher {

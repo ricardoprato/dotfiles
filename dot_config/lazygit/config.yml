@@ -2,7 +2,7 @@ customCommands:
   - key: 'c'
     context: 'files'
     command: 'gitmoji -c'
-    subprocess: true
+    output: terminal
 gui:
   theme:
     activeBorderColor:
@@ -24,4 +24,3 @@ gui:
       - '#cdd6f4'
     searchingActiveBorderColor:
       - '#f9e2af'
-

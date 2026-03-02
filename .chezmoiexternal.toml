@@ -1,0 +1,7 @@
+[".config/nvim"]
+    type = "git-repo"
+    url = "git@github.com:ricardoprato/nvim.git"
+
+[".tmux/plugins/tpm"]
+    type = "git-repo"
+    url = "https://github.com/tmux-plugins/tpm.git"

@@ -1,4 +1,19 @@
 {
+  // Pacman-themed workspaces
+  "hyprland/workspaces": {
+    "format": "{icon}",
+    "format-icons": {
+      "default": "󰊠",
+      "active": "󰮯",
+      "empty": "󰧟"
+    },
+    "persistent-workspaces": {
+      "*": 5
+    },
+    "on-click": "activate",
+    "on-scroll-up": "hyprctl dispatch workspace e+1",
+    "on-scroll-down": "hyprctl dispatch workspace e-1"
+  },
   "mpris": {
     "format": "{player_icon} {dynamic}",
     "rotate": 0,
@@ -14,8 +29,8 @@
       "firefox",
       "zen-browser"
     ],
-    "max-length": 100,
-    "interval": 1
+    "max-length": 20,
+    "interval": 5
   },
   "privacy": {
     "icon-size": 10,
@@ -145,7 +160,7 @@
     },
     "format": "{:%a %d %b | %I:%M %p}", //12 hour format
     "format-alt": "  {:%Y-%m-%d  %H:%M:%S}",
-    "interval": 1
+    "interval": 60
   },
   // System
   "custom/system": {
@@ -227,15 +242,14 @@
     // "interface": "wlp2s0", // (Optional) To force the use of this interface
     "format": "⚠  Disabled",
     "format-wifi": "  {essid}",
-    // "format-ethernet": " {ifname}: {ipaddr}/{cidr}",
     "format-ethernet": "  Wired",
     "format-disconnected": "⚠  Disconnected",
     "tooltip-format": " {ifname} via {gwaddri}",
     "tooltip-format-wifi": "   {essid} ({signalStrength}%)",
     "tooltip-format-ethernet": "  {ifname} ({ipaddr}/{cidr})",
     "tooltip-format-disconnected": "⚠  Disconnected",
-    // "on-click": "alacritty -e nmtui"
-    "on-click": "nm-connection-editor"
+    "on-click": "nm-connection-editor",
+    "interval": 30
   },
   "pulseaudio": {
     // "scroll-step": 5,
@@ -313,5 +327,47 @@
     "format": "  ",
     "interval": "once",
     "tooltip": false
+  },
+  // Bluetooth module
+  "bluetooth": {
+    "format": "󰂯",
+    "format-disabled": "󰂲",
+    "format-connected": "󰂱 {num_connections}",
+    "format-connected-battery": "󰂱 {device_battery_percentage}%",
+    "tooltip-format": "{controller_alias}\t{controller_address}",
+    "tooltip-format-connected": "{controller_alias}\t{controller_address}\n\n{device_enumerate}",
+    "tooltip-format-enumerate-connected": "{device_alias}\t{device_address}",
+    "tooltip-format-enumerate-connected-battery": "{device_alias}\t{device_battery_percentage}%",
+    "on-click": "blueman-manager",
+    "on-click-right": "bluetoothctl power off || bluetoothctl power on"
+  },
+  // Arch updates checker
+  "custom/updates": {
+    "format": "{}",
+    "interval": 3600,
+    "exec": "~/.local/share/bin/update-check.sh --waybar",
+    "return-type": "json",
+    "on-click": "ghostty -e ~/.local/share/bin/update-check.sh --update",
+    "tooltip": true
+  },
+  // Do Not Disturb toggle for dunst
+  "custom/dnd": {
+    "format": "{}",
+    "interval": 30,
+    "exec": "if dunstctl is-paused | grep -q 'true'; then echo '󰂛'; else echo '󰂚'; fi",
+    "on-click": "dunstctl set-paused toggle",
+    "on-click-right": "dunstctl history-pop",
+    "tooltip": true,
+    "tooltip-format": "Left: Toggle DND | Right: Show last notification"
+  },
+  // Gaming Mode toggle
+  "custom/gamemode": {
+    "format": "{}",
+    "interval": 30,
+    "signal": 9,
+    "exec": "~/.local/share/bin/gamemode-toggle.sh --waybar",
+    "return-type": "json",
+    "on-click": "~/.local/share/bin/gamemode-toggle.sh",
+    "tooltip": true
   }
 }
