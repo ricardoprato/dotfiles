@@ -353,7 +353,7 @@
   },
   // Notifications (dunst history + DND toggle)
   "custom/notifications": {
-    "format": "{icon} {}",
+    "format": "{icon} {text}",
     "format-icons": {
       "dnd": "󰂛",
       "notification": "󰂚",
