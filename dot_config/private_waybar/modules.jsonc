@@ -341,24 +341,32 @@
     "on-click": "blueman-manager",
     "on-click-right": "bluetoothctl power off || bluetoothctl power on"
   },
-  // Arch updates checker
+  // Arch updates checker (systemupdate.sh: pacman + AUR + flatpak)
   "custom/updates": {
     "format": "{}",
     "interval": 3600,
-    "exec": "~/.local/share/bin/update-check.sh --waybar",
+    "exec": "~/.local/share/bin/systemupdate.sh",
     "return-type": "json",
-    "on-click": "ghostty -e ~/.local/share/bin/update-check.sh --update",
+    "on-click": "~/.local/share/bin/systemupdate.sh up",
+    "signal": 20,
     "tooltip": true
   },
-  // Do Not Disturb toggle for dunst
-  "custom/dnd": {
-    "format": "{}",
-    "interval": 30,
-    "exec": "if dunstctl is-paused | grep -q 'true'; then echo '󰂛'; else echo '󰂚'; fi",
+  // Notifications (dunst history + DND toggle)
+  "custom/notifications": {
+    "format": "{icon} {0}",
+    "format-icons": {
+      "dnd": "󰂛",
+      "notification": "󰂚",
+      "none": "󰂚"
+    },
+    "return-type": "json",
+    "interval": 5,
+    "exec": "~/.local/share/bin/notifications.py",
     "on-click": "dunstctl set-paused toggle",
-    "on-click-right": "dunstctl history-pop",
-    "tooltip": true,
-    "tooltip-format": "Left: Toggle DND | Right: Show last notification"
+    "on-click-middle": "dunstctl history-clear",
+    "on-click-right": "dunstctl close-all",
+    "on-scroll-down": "dunstctl history-pop",
+    "tooltip": true
   },
   // Gaming Mode toggle
   "custom/gamemode": {

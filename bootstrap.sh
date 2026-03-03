@@ -36,20 +36,7 @@ install_packages() {
 }
 
 # -----------------------------------------------------------
-# 2. Stow dotfiles
-# -----------------------------------------------------------
-stow_dotfiles() {
-    info "Linking dotfiles with stow..."
-
-    # configs/ -> ~/.config, ~/.gitconfig, ~/.tmux.conf, etc.
-    stow -v -d "$DOTFILES_DIR" -t "$HOME" configs
-
-    # scripts/ -> ~/.local/share/bin
-    stow -v -d "$DOTFILES_DIR" -t "$HOME" scripts
-}
-
-# -----------------------------------------------------------
-# 3. System configs (requires sudo)
+# 2. System configs (requires sudo)
 # -----------------------------------------------------------
 setup_system() {
     info "Applying system configurations..."
@@ -82,7 +69,7 @@ setup_system() {
 }
 
 # -----------------------------------------------------------
-# 4. Enable services
+# 3. Enable services
 # -----------------------------------------------------------
 enable_services() {
     info "Enabling system services..."
@@ -119,7 +106,7 @@ enable_services() {
 }
 
 # -----------------------------------------------------------
-# 5. Fish shell
+# 4. Fish shell
 # -----------------------------------------------------------
 setup_shell() {
     if [[ "$SHELL" != *"fish"* ]]; then
