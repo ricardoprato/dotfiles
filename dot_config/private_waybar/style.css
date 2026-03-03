@@ -306,6 +306,7 @@ window#waybar.empty #window {
 #clock,
 #custom-cpuinfo,
 #cpu,
+#disk,
 #custom-github_hyprdots,
 #custom-gpuinfo,
 #idle_inhibitor,

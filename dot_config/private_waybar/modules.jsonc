@@ -185,7 +185,7 @@
   // Harddisc space used
   "disk": {
     // "interval": 30,
-    "format": " {percentage_used}% ",
+    "format": " {percentage_used: >3}%",
     "path": "/"
     //"on-click": "alacritty -e htop"
   },
