@@ -31,7 +31,7 @@ def main():
         "󰳽 scroll:        history pop",
         "󰳽 left click:    toggle DND",
         "󰳽 middle click:  clear history",
-        "󰳽 right click:   close all",
+        "󰳽 right click:   dismiss all",
     ]
 
     if is_paused:

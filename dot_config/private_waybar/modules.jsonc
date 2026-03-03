@@ -365,7 +365,7 @@
     "exec": "~/.local/share/bin/notifications.py",
     "on-click": "dunstctl set-paused toggle && pkill -RTMIN+10 waybar",
     "on-click-middle": "dunstctl history-clear && pkill -RTMIN+10 waybar",
-    "on-click-right": "dunstctl close-all && pkill -RTMIN+10 waybar",
+    "on-click-right": "dunstctl close-all && dunstctl history-clear && pkill -RTMIN+10 waybar",
     "on-scroll-down": "dunstctl history-pop && pkill -RTMIN+10 waybar",
     "tooltip": true
   },
