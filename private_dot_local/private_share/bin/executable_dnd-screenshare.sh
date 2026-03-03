@@ -1,10 +1,13 @@
 #!/bin/bash
 # Auto DND when screen sharing via Hyprland socket events
+# Screenshots (grim) take ~150ms between screencast>>1 and >>0
+# Real screenshares stay active much longer — 1s delay filters them out
 
 SOCKET="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
 AUTO_FILE="/tmp/.dnd-auto"
+PENDING_FILE="/tmp/.dnd-pending"
 
-rm -f "$AUTO_FILE"
+rm -f "$AUTO_FILE" "$PENDING_FILE"
 
 refresh_waybar() {
     pkill -RTMIN+10 waybar 2>/dev/null
@@ -42,11 +45,27 @@ disable_dnd() {
 
 # Monitor Hyprland socket for screencast events only
 socat -U - UNIX-CONNECT:"$SOCKET" 2>/dev/null | while read -r line; do
-    if [[ "$line" == screencast* ]]; then
+    if [[ "$line" == screencast\>\>* ]]; then
         state="${line#*>>}"
         state="${state%%,*}"
 
-        [ "$state" = "1" ] && enable_dnd
-        [ "$state" = "0" ] && disable_dnd
+        if [ "$state" = "1" ]; then
+            touch "$PENDING_FILE"
+            (
+                sleep 1
+                if [ -f "$PENDING_FILE" ]; then
+                    rm -f "$PENDING_FILE"
+                    enable_dnd
+                fi
+            ) &
+        elif [ "$state" = "0" ]; then
+            if [ -f "$PENDING_FILE" ]; then
+                # screencast>>0 arrived before 1s — screenshot, ignore
+                rm -f "$PENDING_FILE"
+            else
+                # screenshare ended
+                disable_dnd
+            fi
+        fi
     fi
 done
