@@ -3015,20 +3015,20 @@ notebook > header tab {
   border: none;
   outline: none;
   background-clip: padding-box;
-  color: <wallbash_4xa9_rgba(0.7)>;
+  color: <wallbash_txt1_rgba(0.7)>;
   font-weight: 500;
   border-radius: 6px;
 }
 
 tabbar scrolledwindow:not(.pinned) > tabbox tab:hover,
 notebook > header tab:hover {
-  background-color: <wallbash_4xa9_rgba(0.04)>;
-  color: #<wallbash_3xa7>;
+  background-color: <wallbash_txt1_rgba(0.08)>;
+  color: #<wallbash_txt1>;
 }
 
 tabbar scrolledwindow:not(.pinned) > tabbox tab:disabled,
 notebook > header tab:disabled {
-  color: <wallbash_4xa9_rgba(0.3)>;
+  color: <wallbash_txt1_rgba(0.3)>;
 }
 
 tabbar scrolledwindow:not(.pinned) > tabbox tab:checked,
@@ -3036,8 +3036,8 @@ notebook > header tab:checked,
 tabbar scrolledwindow:not(.pinned) > tabbox tab:selected,
 notebook > header tab:selected {
   transition: all 75ms cubic-bezier(0, 0, 0.2, 1);
-  background-color: #<wallbash_1xa2>;
-  color: #<wallbash_3xa7>;
+  background-color: #<wallbash_3xa7>;
+  color: #<wallbash_pry1>;
   box-shadow: 0 1px 3px <wallbash_txt4_rgba(0.06)>;
 }
 
@@ -3045,7 +3045,7 @@ tabbar scrolledwindow:not(.pinned) > tabbox tab:checked:disabled,
 notebook > header tab:checked:disabled,
 tabbar scrolledwindow:not(.pinned) > tabbox tab:selected:disabled,
 notebook > header tab:selected:disabled {
-  color: <wallbash_4xa9_rgba(0.5)>;
+  color: <wallbash_txt1_rgba(0.5)>;
 }
 
 frame > paned > notebook > header,

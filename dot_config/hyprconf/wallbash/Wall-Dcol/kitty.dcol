@@ -4,9 +4,10 @@ background         #<wallbash_pry1>
 cursor             #<wallbash_txt1> 
 
 active_tab_foreground     #<wallbash_pry1>
-active_tab_background     #<wallbash_pry2>
-inactive_tab_foreground   #<wallbash_pry2>
+active_tab_background     #<wallbash_3xa7>
+inactive_tab_foreground   #<wallbash_txt1>
 inactive_tab_background   #<wallbash_pry1>
+tab_bar_background        #<wallbash_pry1>
 
 active_border_color   #<wallbash_pry1>
 inactive_border_color #<wallbash_pry2>

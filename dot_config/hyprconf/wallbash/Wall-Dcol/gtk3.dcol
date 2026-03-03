@@ -3769,33 +3769,33 @@ notebook > header tab {
   border: none;
   outline: none;
   background-clip: padding-box;
-  color: <wallbash_4xa9_rgba(0.7)>;
+  color: <wallbash_txt1_rgba(0.7)>;
   font-weight: 500;
   border-radius: 6px;
 }
 
 tabbox > tab:hover,
 notebook > header tab:hover {
-  background-color: <wallbash_4xa9_rgba(0.04)>;
-  color: #<wallbash_4xa9>;
+  background-color: <wallbash_txt1_rgba(0.08)>;
+  color: #<wallbash_txt1>;
 }
 
 tabbox > tab:disabled,
 notebook > header tab:disabled {
-  color: <wallbash_4xa9_rgba(0.3)>;
+  color: <wallbash_txt1_rgba(0.3)>;
 }
 
 tabbox > tab:checked,
 notebook > header tab:checked {
   transition: all 75ms cubic-bezier(0, 0, 0.2, 1);
-  background-color: #<wallbash_1xa1>;
-  color: #<wallbash_3xa7>;
+  background-color: #<wallbash_3xa7>;
+  color: #<wallbash_pry1>;
   box-shadow: 0 1px 3px <wallbash_txt4_rgba(0.06)>;
 }
 
 tabbox > tab:checked:disabled,
 notebook > header tab:checked:disabled {
-  color: <wallbash_4xa9_rgba(0.5)>;
+  color: <wallbash_txt1_rgba(0.5)>;
 }
 
 frame > paned > notebook > header,
