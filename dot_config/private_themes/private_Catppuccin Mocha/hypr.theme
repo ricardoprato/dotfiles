@@ -1,4 +1,4 @@
-$HOME/.config/hypr/themes/theme.conf|> $HOME/.config/hypr/themes/colors.conf && > $HOME/.config/hypr/themes/Wall-Dcol.conf && hyprctl reload
+$HOME/.config/hypr/themes/theme.conf|> $HOME/.config/hypr/themes/colors.conf && > $HOME/.config/hypr/themes/Wall-Dcol.conf && hyprctl reload && sleep 0.3 && gsettings set org.gnome.desktop.interface color-scheme prefer-dark && gsettings set org.gnome.desktop.interface gtk-theme catppuccin-mocha-mauve-standard+default
 #  // P̳r̳a̳s̳a̳n̳t̳h̳ R̳a̳n̳g̳a̳n̳
 
 $GTK_THEME=catppuccin-mocha-mauve-standard+default
@@ -9,8 +9,6 @@ $COLOR_SCHEME = prefer-dark
 # This exec commands will soon be deprecated
 
 exec = gsettings set org.gnome.desktop.interface icon-theme $ICON_THEME
-exec = gsettings set org.gnome.desktop.interface gtk-theme $GTK_THEME
-exec = gsettings set org.gnome.desktop.interface color-scheme $COLOR_SCHEME
 
 general {
     gaps_in = 3

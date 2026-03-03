@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Wallbash-Gtk
+Comment=Dynamically generated GTK theme from wallpaper colors
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=Wallbash-Gtk
+MetacityTheme=Wallbash-Gtk
+IconTheme=Tela-circle-dracula
