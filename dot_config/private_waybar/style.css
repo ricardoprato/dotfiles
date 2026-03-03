@@ -12,6 +12,9 @@
 
 @import "colors.css";
 
+/* Wallbash dynamic colors — overrides colors.css in modes 1-3, empty in mode 0 */
+@import url("themes/Wall-Dcol.css");
+
 
 /* -----------------------------------------------------------------------------
   * Base styles

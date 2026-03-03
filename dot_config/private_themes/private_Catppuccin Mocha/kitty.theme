@@ -1,4 +1,4 @@
-$HOME/.config/kitty/theme.conf|killall -SIGUSR1 kitty
+$HOME/.config/kitty/theme.conf|> $HOME/.config/kitty/themes/Wall-Dcol.conf && killall -SIGUSR1 kitty
 
 ## name:     Catppuccin Mocha 🌿
 ## author:   Pocco81 (https://github.com/Pocco81)

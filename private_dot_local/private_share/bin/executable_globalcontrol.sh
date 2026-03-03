@@ -1,11 +1,12 @@
 #!/usr/bin/env sh
 
 
-#// hyde envs
+#// hyprconf envs
 
 export confDir="${XDG_CONFIG_HOME:-$HOME/.config}"
-export hydeConfDir="${confDir}/hyde"
-export cacheDir="$HOME/.cache/hyde"
+export hydeConfDir="${confDir}/hyprconf"
+export themesDir="${confDir}/themes"
+export cacheDir="$HOME/.cache/hyprconf"
 export thmbDir="${cacheDir}/thumbs"
 export dcolDir="${cacheDir}/dcols"
 export hashMech="sha1sum"
@@ -69,7 +70,7 @@ get_themes()
         [ -f "${thmDir}/.sort" ] && thmSortS+=("$(head -1 "${thmDir}/.sort")") || thmSortS+=("0")
         thmListS+=("$(basename "${thmDir}")")
         thmWallS+=("$(readlink "${thmDir}/wall.set")")
-    done < <(find "${hydeConfDir}/themes" -mindepth 1 -maxdepth 1 -type d)
+    done < <(find "${themesDir}" -mindepth 1 -maxdepth 1 -type d)
 
     while IFS='|' read -r sort theme wall ; do
         thmSort+=("${sort}")
@@ -92,13 +93,13 @@ case "${enableWallDcol}" in
     *) enableWallDcol=0 ;;
 esac
 
-if [ -z "${hydeTheme}" ] || [ ! -d "${hydeConfDir}/themes/${hydeTheme}" ] ; then
+if [ -z "${hydeTheme}" ] || [ ! -d "${themesDir}/${hydeTheme}" ] ; then
     get_themes
     hydeTheme="${thmList[0]}"
 fi
 
 export hydeTheme
-export hydeThemeDir="${hydeConfDir}/themes/${hydeTheme}"
+export hydeThemeDir="${themesDir}/${hydeTheme}"
 export wallbashDir="${hydeConfDir}/wallbash"
 export enableWallDcol
 

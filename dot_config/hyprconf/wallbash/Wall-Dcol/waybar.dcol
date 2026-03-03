@@ -1,0 +1,38 @@
+$HOME/.config/waybar/themes/Wall-Dcol.css|killall -SIGUSR2 waybar
+/* Wallbash-generated overrides for Catppuccin palette */
+
+/* Backgrounds */
+@define-color crust #<wallbash_1xa1>;
+@define-color mantle #<wallbash_1xa2>;
+@define-color base #<wallbash_pry1>;
+
+/* Text */
+@define-color text #<wallbash_txt1>;
+@define-color subtext0 #<wallbash_txt3>;
+@define-color subtext1 #<wallbash_txt2>;
+
+/* Surfaces */
+@define-color surface0 #<wallbash_1xa3>;
+@define-color surface1 #<wallbash_1xa4>;
+@define-color surface2 #<wallbash_1xa5>;
+
+/* Overlays */
+@define-color overlay0 #<wallbash_1xa6>;
+@define-color overlay1 #<wallbash_1xa7>;
+@define-color overlay2 #<wallbash_1xa8>;
+
+/* Accents */
+@define-color lavender #<wallbash_txt1>;
+@define-color mauve #<wallbash_pry4>;
+@define-color blue #<wallbash_2xa5>;
+@define-color sapphire #<wallbash_2xa7>;
+@define-color sky #<wallbash_3xa5>;
+@define-color teal #<wallbash_3xa7>;
+@define-color green #<wallbash_3xa3>;
+@define-color yellow #<wallbash_4xa5>;
+@define-color peach #<wallbash_4xa3>;
+@define-color flamingo #<wallbash_2xa3>;
+@define-color red #<wallbash_pry2>;
+@define-color maroon #<wallbash_pry3>;
+@define-color pink #<wallbash_4xa7>;
+@define-color rosewater #<wallbash_txt4>;

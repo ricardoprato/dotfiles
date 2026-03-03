@@ -3,6 +3,7 @@
 #// set variables
 
 export scrDir="$(dirname "$(realpath "$0")")"
+export ScrDir="${scrDir}" # compat: .dcol files use uppercase
 source "${scrDir}/globalcontrol.sh"
 wallbashImg="${1}"
 
