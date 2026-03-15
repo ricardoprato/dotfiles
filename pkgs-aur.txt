@@ -1,4 +1,6 @@
-# === Shared ===
+libfprint-tod-debug
 neovim-git
+pokemon-colorscripts-git
 tree-sitter-lua-git
+tree-sitter-lua-git-debug
 yay

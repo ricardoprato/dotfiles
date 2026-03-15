@@ -1,22 +1,12 @@
-# === GUI/themes (from shared) ===
-bibata-cursor-theme
-burpsuite
-catppuccin-gtk-theme-mocha
-catppuccin-sddm-theme-mocha
-kvantum-theme-catppuccin-git
-sddm-git
-ttf-joypixels
-ttf-ms-fonts
-wlogout
-
-# === Desktop-only AUR packages (existing) ===
 anydesk-bin
 arc
 auto-cpufreq
 aylurs-gtk-shell-git-debug
-betterbird-bin
 betterbird-bin-debug
+bibata-cursor-theme
 brave-bin
+catppuccin-gtk-theme-mocha
+catppuccin-sddm-theme-mocha
 claude-code
 forticlient-vpn-debug
 gitflow-cjs
@@ -24,6 +14,7 @@ google-chrome
 gtk-sharp-2-debug
 kdoctools5
 kdoctools5-debug
+kvantum-theme-catppuccin-git
 libappindicator-gtk2-debug
 libastal-4-git-debug
 libastal-apps-git-debug
@@ -48,16 +39,18 @@ neovim-git-debug
 notion-app-electron
 notion-app-electron-debug
 pam-fprint-grosshack
-plasma-framework5
-plasma-framework5-debug
 postman-bin
 python-clickgen
 qt5-doc
 rtl8188gu-dkms-git
+sddm-git
 spotify-player-full
 spotify-player-full-debug
 thunderbird-bin
+ttf-joypixels
+ttf-ms-fonts
 visual-studio-code-bin
+wlogout
 xwaylandvideobridge-git
 yay-debug
 yp-tools
