@@ -1,0 +1,9 @@
+{{- $profile := "desktop" -}}
+{{- if .chezmoi.kernel -}}
+{{-   if regexMatch "(?i)(microsoft|wsl)" .chezmoi.kernel.osrelease -}}
+{{-     $profile = "wsl" -}}
+{{-   end -}}
+{{- end -}}
+
+[data]
+    profile = {{ $profile | quote }}

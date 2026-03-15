@@ -38,23 +38,27 @@
       "key": "  󰏗 Packages",
       "keyColor": "green"
     },
+{{- if ne .profile "wsl" }}
     {
       "type": "display",
       "key": "  󰍹 Display",
       "format": "{1}x{2} @ {3}Hz [{7}]",
       "keyColor": "green"
     },
+{{- end }}
     {
       "type": "terminal",
       "key": "  >_ Terminal",
       "keyColor": "yellow"
     },
+{{- if ne .profile "wsl" }}
     {
       "type": "wm",
       "key": "  󱗃 WM",
       "format": "{2}",
       "keyColor": "yellow"
     },
+{{- end }}
     {
       "type": "custom",
       "format": "└──────────────────────────────────────────┘"
@@ -75,6 +79,7 @@
       "key": "   CPU",
       "keyColor": "blue"
     },
+{{- if ne .profile "wsl" }}
     {
       "type": "gpu",
       "format": "{1} {2}",
@@ -87,6 +92,7 @@
       "key": "   GPU Driver",
       "keyColor": "magenta"
     },
+{{- end }}
     {
       "type": "memory",
       "key": "    Memory",

@@ -16,12 +16,41 @@ ask() {
     [[ "$answer" =~ ^[Yy]$ ]]
 }
 
+# Detect profile from chezmoi data
+PROFILE="desktop"
+if command -v chezmoi &>/dev/null; then
+    PROFILE="$(chezmoi execute-template '{{ .profile }}' 2>/dev/null || echo "desktop")"
+fi
+info "Profile: $PROFILE"
+
+# Helper: install from package list, skipping comments and blank lines
+install_from_list() {
+    local list="$1"
+    if [[ -f "$list" ]]; then
+        grep -v '^#' "$list" | grep -v '^$'
+    fi
+}
+
 # -----------------------------------------------------------
 # 1. Install packages
 # -----------------------------------------------------------
 install_packages() {
-    info "Installing native pacman packages..."
-    sudo pacman -S --needed --noconfirm - < "$DOTFILES_DIR/pkgs-pacman.txt"
+    info "Installing base pacman packages..."
+    install_from_list "$DOTFILES_DIR/pkgs-pacman.txt" | \
+        sudo pacman -S --needed --noconfirm -
+
+    case "$PROFILE" in
+        desktop)
+            info "Installing desktop-only pacman packages..."
+            install_from_list "$DOTFILES_DIR/pkgs-pacman-desktop.txt" | \
+                sudo pacman -S --needed --noconfirm -
+            ;;
+        wsl)
+            info "Installing WSL-specific pacman packages..."
+            install_from_list "$DOTFILES_DIR/pkgs-pacman-wsl.txt" | \
+                sudo pacman -S --needed --noconfirm -
+            ;;
+    esac
 
     if ! command -v yay &>/dev/null; then
         info "Installing yay..."
@@ -31,8 +60,44 @@ install_packages() {
         rm -rf /tmp/yay-install
     fi
 
-    info "Installing AUR packages..."
-    yay -S --needed --noconfirm - < "$DOTFILES_DIR/pkgs-aur.txt"
+    info "Installing base AUR packages..."
+    install_from_list "$DOTFILES_DIR/pkgs-aur.txt" | \
+        yay -S --needed --noconfirm -
+
+    case "$PROFILE" in
+        desktop)
+            info "Installing desktop-only AUR packages..."
+            install_from_list "$DOTFILES_DIR/pkgs-aur-desktop.txt" | \
+                yay -S --needed --noconfirm -
+            ;;
+        wsl)
+            info "Installing WSL-specific AUR packages..."
+            install_from_list "$DOTFILES_DIR/pkgs-aur-wsl.txt" | \
+                yay -S --needed --noconfirm -
+            ;;
+    esac
+}
+
+# -----------------------------------------------------------
+# BlackArch Repository Setup
+# -----------------------------------------------------------
+setup_blackarch() {
+    if ! pacman -Sl blackarch &>/dev/null; then
+        info "Installing BlackArch repository..."
+        local tmpdir
+        tmpdir="$(mktemp -d)"
+        curl -fsSL https://blackarch.org/strap.sh -o "$tmpdir/strap.sh"
+        chmod +x "$tmpdir/strap.sh"
+        sudo "$tmpdir/strap.sh"
+        rm -rf "$tmpdir"
+        sudo pacman -Syy
+    else
+        warn "BlackArch repository already configured."
+    fi
+
+    info "Installing BlackArch tools..."
+    install_from_list "$DOTFILES_DIR/pkgs-blackarch.txt" | \
+        sudo pacman -S --needed --noconfirm -
 }
 
 # -----------------------------------------------------------
@@ -41,9 +106,11 @@ install_packages() {
 setup_system() {
     info "Applying system configurations..."
 
-    # earlyoom
-    sudo cp "$DOTFILES_DIR/system/earlyoom" /etc/default/earlyoom
-    info "earlyoom config applied."
+    if [[ "$PROFILE" == "desktop" ]]; then
+        # earlyoom
+        sudo cp "$DOTFILES_DIR/system/earlyoom" /etc/default/earlyoom
+        info "earlyoom config applied."
+    fi
 
     # swappiness
     sudo cp "$DOTFILES_DIR/system/99-swappiness.conf" /etc/sysctl.d/99-swappiness.conf
@@ -74,27 +141,58 @@ setup_system() {
 enable_services() {
     info "Enabling system services..."
 
-    local system_services=(
-        bluetooth
-        cups
-        earlyoom
-        NetworkManager
-        sddm
-        systemd-resolved
-        systemd-timesyncd
-        fstrim.timer
-    )
+    local system_services=()
+    local user_services=()
 
-    local user_services=(
-        hypridle
-        hyprpaper
-        hyprpolkitagent
-        kanata
-        pipewire
-        pipewire-pulse
-        waybar
-        wireplumber
-    )
+    case "$PROFILE" in
+        desktop)
+            system_services=(
+                NetworkManager
+                sddm
+                systemd-resolved
+                systemd-timesyncd
+                fstrim.timer
+                bluetooth
+                cups
+                earlyoom
+            )
+            user_services=(
+                hypridle
+                hyprpaper
+                hyprpolkitagent
+                kanata
+                pipewire
+                pipewire-pulse
+                waybar
+                wireplumber
+            )
+            ;;
+        wsl)
+            system_services=(
+                systemd-resolved
+                systemd-timesyncd
+            )
+            ;;
+        blackarch)
+            system_services=(
+                NetworkManager
+                sddm
+                systemd-resolved
+                systemd-timesyncd
+                fstrim.timer
+            )
+            user_services=(
+                hypridle
+                hyprpaper
+                hyprpolkitagent
+                kanata
+                pipewire
+                pipewire-pulse
+                waybar
+                wireplumber
+            )
+            ;;
+    esac
 
     for svc in "${system_services[@]}"; do
         sudo systemctl enable --now "$svc" 2>/dev/null && info "  $svc enabled" || warn "  $svc skipped"
@@ -125,13 +223,21 @@ setup_shell() {
 main() {
     echo ""
     echo "========================================="
-    echo "  redfoxd's Arch Linux Bootstrap"
+    case "$PROFILE" in
+        blackarch) echo "  redfoxd's BlackArch VM Bootstrap" ;;
+        wsl)       echo "  redfoxd's Arch WSL Bootstrap" ;;
+        *)         echo "  redfoxd's Arch Linux Bootstrap" ;;
+    esac
     echo "========================================="
     echo ""
 
     ask "Install packages (pacman + AUR)?"  && install_packages
-    ask "Link dotfiles with stow?"          && stow_dotfiles
-    ask "Apply system configs?"             && setup_system
+    if [[ "$PROFILE" == "blackarch" ]]; then
+        ask "Setup BlackArch repo & tools?"  && setup_blackarch
+    fi
+    if [[ "$PROFILE" != "wsl" ]]; then
+        ask "Apply system configs?"         && setup_system
+    fi
     ask "Enable services?"                  && enable_services
     ask "Set fish as default shell?"        && setup_shell
 

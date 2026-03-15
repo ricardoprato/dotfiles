@@ -28,9 +28,10 @@ if status is-interactive
     abbr .3 'cd ../../..'
     abbr .4 'cd ../../../..'
     abbr .5 'cd ../../../../..'
-
+{{ if ne .profile "wsl" }}
     # Kitty en SSH
     if test "$TERM" = "xterm-kitty"
         abbr ssh 'kitty +kitten ssh'
     end
+{{- end }}
 end

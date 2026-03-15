@@ -2,7 +2,12 @@
 bootstrap.sh
 update-pkgs.sh
 pkgs-pacman.txt
+pkgs-pacman-desktop.txt
+pkgs-pacman-wsl.txt
 pkgs-aur.txt
+pkgs-aur-desktop.txt
+pkgs-aur-wsl.txt
+pkgs-blackarch.txt
 system
 system/**
 LICENSE
@@ -19,3 +24,29 @@ README*
 .config/waybar/themes/Wall-Dcol.css
 .config/dunst/Wall-Dcol.conf
 .config/rofi/themes/Wall-Dcol.rasi
+
+{{ if eq .profile "wsl" }}
+# GUI / Desktop (not available in WSL)
+.config/hypr/**
+.config/hyprconf/**
+.config/kitty/**
+.config/alacritty/**
+.config/kanata/**
+.config/dunst/**
+.config/rofi/**
+.config/waybar/**
+.config/gtk-3.0/**
+.config/Kvantum/**
+.config/themes/**
+.config/systemd/**
+.config/uwsm/**
+.config/electron-flags.conf
+.config/libinput-gestures.conf
+.local/share/bin/**
+.local/share/themes/**
+
+# Zsh (not used in WSL — Fish only)
+.zshrc
+.zimrc
+.config/zsh/**
+{{ end }}

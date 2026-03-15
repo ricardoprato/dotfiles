@@ -1,0 +1,54 @@
+# === Recon ===
+nmap
+masscan
+amass
+subfinder
+httpx
+whatweb
+wafw00f
+dnsrecon
+
+# === Web ===
+sqlmap
+gobuster
+ffuf
+nikto
+dirb
+wpscan
+xsser
+
+# === Exploit ===
+metasploit
+exploitdb
+searchsploit
+
+# === Password ===
+hashcat
+john
+hydra
+crunch
+cewl
+
+# === Network ===
+wireshark-qt
+tcpdump
+responder
+bettercap
+netcat
+socat
+proxychains-ng
+
+# === Wireless ===
+aircrack-ng
+
+# === Wordlists ===
+seclists
+wordlists
+
+# === Utilities ===
+openvpn
+enum4linux
+smbclient
+evil-winrm
+chisel
+ligolo-ng
