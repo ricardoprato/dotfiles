@@ -78,79 +78,154 @@ if [[ -n "$removed_aur" ]]; then
     echo "$removed_aur" | sed 's/^/  - /'
 fi
 
-if [[ -z "$new_pacman" && -z "$new_aur" && -z "$removed_pacman" && -z "$removed_aur" ]]; then
-    info "All package lists are up to date. Nothing to do."
-    exit 0
+pacman_changed=false
+if [[ -n "$new_pacman" || -n "$new_aur" || -n "$removed_pacman" || -n "$removed_aur" ]]; then
+    pacman_changed=true
 fi
 
+if $pacman_changed; then
+    echo ""
+    hint "Where should NEW packages go?"
+    hint "  1) shared   — all profiles"
+    hint "  2) profile  — only $PROFILE"
+    hint "  3) skip     — don't add new packages"
+    read -rp "Choice [1/2/3]: " choice
+
+    # --- Update shared lists: remove uninstalled packages ---
+    # Only remove from shared if not installed AND not in the other profile's list
+    updated_shared_pacman="$(comm -12 <(echo "$shared_pacman") <(echo "$native_installed"))"
+    updated_shared_aur="$(comm -12 <(echo "$shared_aur") <(echo "$aur_installed"))"
+
+    # --- Update profile-specific list: remove uninstalled packages ---
+    updated_profile_pacman="$(comm -12 <(echo "$profile_pacman") <(echo "$native_installed"))"
+    updated_profile_aur="$(comm -12 <(echo "$profile_aur") <(echo "$aur_installed"))"
+
+    case "$choice" in
+        1)
+            # Add new packages to shared
+            updated_shared_pacman="$(echo -e "$updated_shared_pacman\n$new_pacman" | grep -v '^$' | sort -u)"
+            updated_shared_aur="$(echo -e "$updated_shared_aur\n$new_aur" | grep -v '^$' | sort -u)"
+            ;;
+        2)
+            # Add new packages to profile-specific
+            updated_profile_pacman="$(echo -e "$updated_profile_pacman\n$new_pacman" | grep -v '^$' | sort -u)"
+            updated_profile_aur="$(echo -e "$updated_profile_aur\n$new_aur" | grep -v '^$' | sort -u)"
+            ;;
+        3)
+            info "Skipping new packages."
+            ;;
+        *)
+            warn "Invalid choice. Skipping new packages."
+            ;;
+    esac
+
+    # --- Write files ---
+    echo "$updated_shared_pacman" > "$DOTFILES_DIR/pkgs-pacman.txt"
+    echo "$updated_shared_aur" > "$DOTFILES_DIR/pkgs-aur.txt"
+
+    case "$PROFILE" in
+        desktop)
+            echo "$updated_profile_pacman" > "$DOTFILES_DIR/pkgs-pacman-desktop.txt"
+            echo "$updated_profile_aur" > "$DOTFILES_DIR/pkgs-aur-desktop.txt"
+            ;;
+        wsl)
+            echo "$updated_profile_pacman" > "$DOTFILES_DIR/pkgs-pacman-wsl.txt"
+            echo "$updated_profile_aur" > "$DOTFILES_DIR/pkgs-aur-wsl.txt"
+            ;;
+        blackarch)
+            echo "$updated_profile_pacman" > "$DOTFILES_DIR/pkgs-blackarch.txt"
+            ;;
+    esac
+fi
+
+# --- Extra package managers ---
+
+get_flatpak_installed() {
+    flatpak list --app --columns=application | sort
+}
+
+get_cargo_installed() {
+    cargo install --list | grep -E '^\S' | cut -d' ' -f1 | sort
+}
+
+get_pnpm_installed() {
+    pnpm list -g --depth=0 --json | jq -r '.[].dependencies // {} | keys[]' | sort
+}
+
+sync_extra_list() {
+    local name="$1"       # "flatpak", "cargo", "pnpm"
+    local cmd="$2"        # comando para verificar existencia
+    local get_fn="$3"     # función para obtener instalados
+    local list_file="$DOTFILES_DIR/pkgs-${name}.txt"
+
+    # Guard: skip si el comando no existe
+    command -v "$cmd" &>/dev/null || return 0
+
+    # Guard: skip flatpak en WSL
+    if [[ "$name" == "flatpak" && "$PROFILE" == "wsl" ]]; then
+        return 0
+    fi
+
+    local installed
+    installed="$($get_fn)"
+    local listed
+    listed="$(read_list "$list_file")"
+
+    local new removed
+    new="$(comm -23 <(echo "$installed") <(echo "$listed"))"
+    removed="$(comm -23 <(echo "$listed") <(echo "$installed"))"
+
+    if [[ -z "$new" && -z "$removed" ]]; then
+        return 0
+    fi
+
+    # Reportar cambios
+    if [[ -n "$new" ]]; then
+        warn "New $name packages:"
+        echo "$new" | sed 's/^/  + /'
+    fi
+    if [[ -n "$removed" ]]; then
+        warn "Removed $name packages:"
+        echo "$removed" | sed 's/^/  - /'
+    fi
+
+    # Auto-actualizar lista
+    local updated
+    updated="$(comm -12 <(echo "$listed") <(echo "$installed"))"
+    updated="$(echo -e "$updated\n$new" | grep -v '^$' | sort -u)"
+    echo "$updated" > "$list_file"
+    info "Updated pkgs-${name}.txt ($(echo "$updated" | wc -l) packages)"
+}
+
 echo ""
-hint "Where should NEW packages go?"
-hint "  1) shared   — all profiles"
-hint "  2) profile  — only $PROFILE"
-hint "  3) skip     — don't add new packages"
-read -rp "Choice [1/2/3]: " choice
-
-# --- Update shared lists: remove uninstalled packages ---
-# Only remove from shared if not installed AND not in the other profile's list
-updated_shared_pacman="$(comm -12 <(echo "$shared_pacman") <(echo "$native_installed"))"
-updated_shared_aur="$(comm -12 <(echo "$shared_aur") <(echo "$aur_installed"))"
-
-# --- Update profile-specific list: remove uninstalled packages ---
-updated_profile_pacman="$(comm -12 <(echo "$profile_pacman") <(echo "$native_installed"))"
-updated_profile_aur="$(comm -12 <(echo "$profile_aur") <(echo "$aur_installed"))"
-
-case "$choice" in
-    1)
-        # Add new packages to shared
-        updated_shared_pacman="$(echo -e "$updated_shared_pacman\n$new_pacman" | grep -v '^$' | sort -u)"
-        updated_shared_aur="$(echo -e "$updated_shared_aur\n$new_aur" | grep -v '^$' | sort -u)"
-        ;;
-    2)
-        # Add new packages to profile-specific
-        updated_profile_pacman="$(echo -e "$updated_profile_pacman\n$new_pacman" | grep -v '^$' | sort -u)"
-        updated_profile_aur="$(echo -e "$updated_profile_aur\n$new_aur" | grep -v '^$' | sort -u)"
-        ;;
-    3)
-        info "Skipping new packages."
-        ;;
-    *)
-        warn "Invalid choice. Skipping new packages."
-        ;;
-esac
-
-# --- Write files ---
-echo "$updated_shared_pacman" > "$DOTFILES_DIR/pkgs-pacman.txt"
-echo "$updated_shared_aur" > "$DOTFILES_DIR/pkgs-aur.txt"
-
-case "$PROFILE" in
-    desktop)
-        echo "$updated_profile_pacman" > "$DOTFILES_DIR/pkgs-pacman-desktop.txt"
-        echo "$updated_profile_aur" > "$DOTFILES_DIR/pkgs-aur-desktop.txt"
-        ;;
-    wsl)
-        echo "$updated_profile_pacman" > "$DOTFILES_DIR/pkgs-pacman-wsl.txt"
-        echo "$updated_profile_aur" > "$DOTFILES_DIR/pkgs-aur-wsl.txt"
-        ;;
-    blackarch)
-        echo "$updated_profile_pacman" > "$DOTFILES_DIR/pkgs-blackarch.txt"
-        ;;
-esac
+info "--- Extra package managers ---"
+sync_extra_list "flatpak" "flatpak" "get_flatpak_installed"
+sync_extra_list "cargo" "cargo" "get_cargo_installed"
+sync_extra_list "pnpm" "pnpm" "get_pnpm_installed"
 
 # --- Summary ---
 echo ""
 info "Updated package lists:"
-echo "  pkgs-pacman.txt          $(wc -l < "$DOTFILES_DIR/pkgs-pacman.txt") packages"
-echo "  pkgs-aur.txt             $(wc -l < "$DOTFILES_DIR/pkgs-aur.txt") packages"
-case "$PROFILE" in
-    desktop)
-        echo "  pkgs-pacman-desktop.txt  $(wc -l < "$DOTFILES_DIR/pkgs-pacman-desktop.txt") packages"
-        echo "  pkgs-aur-desktop.txt     $(wc -l < "$DOTFILES_DIR/pkgs-aur-desktop.txt") packages"
-        ;;
-    wsl)
-        echo "  pkgs-pacman-wsl.txt      $(wc -l < "$DOTFILES_DIR/pkgs-pacman-wsl.txt") packages"
-        echo "  pkgs-aur-wsl.txt         $(wc -l < "$DOTFILES_DIR/pkgs-aur-wsl.txt") packages"
-        ;;
-    blackarch)
-        echo "  pkgs-blackarch.txt       $(wc -l < "$DOTFILES_DIR/pkgs-blackarch.txt") packages"
-        ;;
-esac
+if $pacman_changed; then
+    echo "  pkgs-pacman.txt          $(wc -l < "$DOTFILES_DIR/pkgs-pacman.txt") packages"
+    echo "  pkgs-aur.txt             $(wc -l < "$DOTFILES_DIR/pkgs-aur.txt") packages"
+    case "$PROFILE" in
+        desktop)
+            echo "  pkgs-pacman-desktop.txt  $(wc -l < "$DOTFILES_DIR/pkgs-pacman-desktop.txt") packages"
+            echo "  pkgs-aur-desktop.txt     $(wc -l < "$DOTFILES_DIR/pkgs-aur-desktop.txt") packages"
+            ;;
+        wsl)
+            echo "  pkgs-pacman-wsl.txt      $(wc -l < "$DOTFILES_DIR/pkgs-pacman-wsl.txt") packages"
+            echo "  pkgs-aur-wsl.txt         $(wc -l < "$DOTFILES_DIR/pkgs-aur-wsl.txt") packages"
+            ;;
+        blackarch)
+            echo "  pkgs-blackarch.txt       $(wc -l < "$DOTFILES_DIR/pkgs-blackarch.txt") packages"
+            ;;
+    esac
+fi
+for mgr in flatpak cargo pnpm; do
+    local_f="$DOTFILES_DIR/pkgs-${mgr}.txt"
+    if [[ -f "$local_f" ]] && command -v "$mgr" &>/dev/null; then
+        echo "  pkgs-${mgr}.txt          $(wc -l < "$local_f") packages"
+    fi
+done

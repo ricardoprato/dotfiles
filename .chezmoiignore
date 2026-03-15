@@ -8,6 +8,9 @@ pkgs-aur.txt
 pkgs-aur-desktop.txt
 pkgs-aur-wsl.txt
 pkgs-blackarch.txt
+pkgs-flatpak.txt
+pkgs-cargo.txt
+pkgs-pnpm.txt
 system
 system/**
 LICENSE

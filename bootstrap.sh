@@ -218,6 +218,43 @@ setup_shell() {
 }
 
 # -----------------------------------------------------------
+# 5. Extra package managers (flatpak/cargo/pnpm)
+# -----------------------------------------------------------
+install_extras() {
+    # Flatpak (solo si existe y no es WSL)
+    if command -v flatpak &>/dev/null && [[ "$PROFILE" != "wsl" ]]; then
+        local flatpak_list="$DOTFILES_DIR/pkgs-flatpak.txt"
+        if [[ -f "$flatpak_list" ]] && [[ -s "$flatpak_list" ]]; then
+            info "Installing Flatpak apps..."
+            while IFS= read -r app; do
+                flatpak install -y flathub "$app" 2>/dev/null || warn "  $app failed"
+            done < <(install_from_list "$flatpak_list")
+        fi
+    fi
+
+    # Cargo
+    if command -v cargo &>/dev/null; then
+        local cargo_list="$DOTFILES_DIR/pkgs-cargo.txt"
+        if [[ -f "$cargo_list" ]] && [[ -s "$cargo_list" ]]; then
+            info "Installing Cargo crates..."
+            while IFS= read -r crate; do
+                cargo install "$crate" 2>/dev/null || warn "  $crate failed"
+            done < <(install_from_list "$cargo_list")
+        fi
+    fi
+
+    # PNPM
+    if command -v pnpm &>/dev/null; then
+        local pnpm_list="$DOTFILES_DIR/pkgs-pnpm.txt"
+        if [[ -f "$pnpm_list" ]] && [[ -s "$pnpm_list" ]]; then
+            info "Installing PNPM globals..."
+            install_from_list "$pnpm_list" | \
+                xargs pnpm add -g 2>/dev/null || warn "  pnpm install failed"
+        fi
+    fi
+}
+
+# -----------------------------------------------------------
 # Main
 # -----------------------------------------------------------
 main() {
@@ -239,6 +276,7 @@ main() {
         ask "Apply system configs?"         && setup_system
     fi
     ask "Enable services?"                  && enable_services
+    ask "Install extras (flatpak/cargo/pnpm)?" && install_extras
     ask "Set fish as default shell?"        && setup_shell
 
     echo ""
