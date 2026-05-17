@@ -34,6 +34,7 @@ Each app's configuration lives entirely under its `dot_config/<app>/` dir. omarc
 - `empty_<name>` → allow tracking empty files (chezmoi skips empty otherwise)
 - `.tmpl` suffix → Go templating (`dot_config/fish/*.tmpl`, `dot_config/bat/config.tmpl`)
 - `.chezmoiignore` excludes CLAUDE.md, README.md, .planning, .worktrees
+- `.chezmoiexternal.toml` declares git repos chezmoi clones+pulls into target paths (e.g., `~/.config/nvim` from `github.com/ricardoprato/nvim`). Externals keep their own `.git` dir and standalone push/pull workflow; chezmoi pulls them every `refreshPeriod` (default in this repo: 168h). Dirty working tree blocks the pull — commit or stash before `chezmoi apply`.
 
 ## Theming pipeline
 
@@ -80,14 +81,98 @@ Env vars (set in `dot_config/uwsm/env`): `DOTFILES_PATH=~/.local/share/dotfiles`
 - `omarchy-theme-set-keyboard-{asus-rog,f16}` — sends RGB to hardware-specific tools
 - `omarchy-theme-set-foot` — sends OSC escapes to running foot windows (live update — pull-pattern fallback for fresh windows still works)
 
-### Adding a new app to the theme pipeline
+### Adding a new theme
 
-3 steps:
-1. Drop `<app>.<ext>.tpl` in `dot_local/share/dotfiles/themed/` with `{{ foreground }}` / `{{ accent }}` / `{{ background }}` etc. placeholders (see `colors.toml` for available keys, with `_strip` and `_rgb` variants).
-2. Ensure `~/.config/<app>/<entry>` includes/imports `theme.<ext>` (creating the entry file in chezmoi if needed).
-3. If the app needs reload-on-theme-change, add a call in `omarchy-theme-set` to its restart helper.
+```bash
+cd ~/.local/share/chezmoi
+mkdir -p dot_local/share/dotfiles/themes/<name>/backgrounds
+```
 
-No edits to `omarchy-theme-set-templates` needed unless the destination doesn't match the convention.
+Minimum required inside the theme dir:
+
+```
+themes/<name>/
+  colors.toml             REQUIRED — palette source of truth
+  backgrounds/*.{png,jpg} REQUIRED — at least one wallpaper image
+  preview.png             optional — for the theme switcher card
+  light.mode              optional — empty file marker for light themes
+  neovim.lua              optional — colorscheme spec table for nvim integration
+  vscode.json             optional — { name, extension } for VS Code handler
+  btop.theme              optional — copy from another theme and adapt
+  icons.theme             optional — GNOME icon theme name string
+```
+
+`colors.toml` must define at minimum:
+
+```toml
+accent = "#7aa2f7"
+cursor = "#c0caf5"
+foreground = "#a9b1d6"
+background = "#1a1b26"
+selection_foreground = "#c0caf5"
+selection_background = "#3d4a8a"
+
+# ANSI palette (used by terminals)
+color0  = "#15161e"
+color1  = "#f7768e"
+# ... color2..color15
+```
+
+Each key is available in templates in 3 forms: `{{ accent }}` → `#7aa2f7`, `{{ accent_strip }}` → `7aa2f7` (no `#`), `{{ accent_rgb }}` → `122,162,247` (decimal).
+
+Apply and switch:
+
+```bash
+chezmoi apply --force
+omarchy-theme-set <name>
+```
+
+The theme appears automatically in `omarchy-theme-switcher` (it reads from `$DOTFILES_PATH/themes/`).
+
+### Adding a template for a new app
+
+**Case 1 — app supports `include`/`@import`/`source` (pull pattern):**
+
+1. Create template:
+   ```bash
+   chezmoi edit ~/.local/share/dotfiles/themed/<app>.<ext>.tpl
+   # body uses {{ accent }}, {{ background }}, etc.
+   ```
+2. Make the app's entry config import the rendered file:
+   ```bash
+   chezmoi edit ~/.config/<app>/<entry-config>
+   # add: include theme.<ext>  /  @import "theme.<ext>";  /  source = ~/.config/<app>/theme.<ext>
+   ```
+3. If reload-on-change is needed, add a call in `omarchy-theme-set` near the other `omarchy-restart-*` lines.
+4. `chezmoi apply --force && omarchy-theme-refresh`
+
+The renderer automatically discovers `<app>.<ext>.tpl` and writes to `~/.config/<app>/theme.<ext>` by convention. No edit to `omarchy-theme-set-templates` needed.
+
+**Case 2 — app has no include mechanism (full-config theming, like starship):**
+
+1. Create template containing the entire app config, with placeholders for colors.
+2. Add a destination exception in `omarchy-theme-set-templates`:
+   ```bash
+   <app>.<ext>)  echo "$HOME/.config/<app>/<real-config-name>" ;;
+   ```
+3. If a chezmoi-tracked version of that config existed, remove it: `git -C $(chezmoi source-path) rm dot_config/<app>/<real-config-name>` (template now owns the file).
+4. `chezmoi apply --force && omarchy-theme-refresh`
+
+**Case 3 — app needs imperative push (gsettings, settings.json patch, hardware CLI):**
+
+1. (Optional) Create template if the handler needs a rendered file as input (Case 1).
+2. Write `~/.local/bin/executable_omarchy-theme-set-<app>` that reads the rendered file and applies it via the app's API.
+3. Add call in `omarchy-theme-set` under the "Push-pattern handlers" block.
+4. `chezmoi apply --force && omarchy-theme-refresh`
+
+### Verification
+
+```bash
+# Sweep for dead refs after any path-related change
+grep -rn "share/omarchy/default/\|omarchy/current/" $(chezmoi source-path) \
+  | grep -v "CLAUDE\|SKILL\|.planning"
+# Expect: empty
+```
 
 ## Workflow
 
