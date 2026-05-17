@@ -5,9 +5,39 @@
 
 browser=$(xdg-settings get default-web-browser)
 
-case $browser in
-google-chrome* | brave* | microsoft-edge* | opera* | vivaldi* | helium*) ;;
-*) browser="chromium.desktop" ;;
+# Match the desktop file family — names can be canonical (google-chrome.desktop)
+# or user-installed PWA variants (userapp-Zen-XXX.desktop) so we lowercase first.
+browser_lc=$(echo "$browser" | tr '[:upper:]' '[:lower:]')
+
+mode=app  # default: chromium-style --app=<url> (chromeless PWA window)
+
+case $browser_lc in
+  google-chrome*|brave*|microsoft-edge*|opera*|vivaldi*|helium*|chromium*)
+    ;;
+  *zen*|*firefox*|*librewolf*)
+    # Firefox-family browsers have no --app= equivalent. Open in a new window.
+    mode=window
+    case $browser_lc in
+      *zen*)       browser="zen.desktop" ;;
+      *firefox*)   browser="firefox.desktop" ;;
+      *librewolf*) browser="librewolf.desktop" ;;
+    esac
+    ;;
+  *)
+    # Unknown — fall back to chromium.
+    browser="chromium.desktop"
+    ;;
 esac
 
-exec setsid uwsm-app -- $(sed -n 's/^Exec=\([^ ]*\).*/\1/p' {~/.local,~/.nix-profile,/usr}/share/applications/$browser 2>/dev/null | head -1) --app="$1" "${@:2}"
+exec_bin=$(sed -n 's/^Exec=\([^ ]*\).*/\1/p' {~/.local,~/.nix-profile,/usr}/share/applications/$browser 2>/dev/null | head -1)
+
+if [[ -z $exec_bin ]]; then
+  notify-send -u critical "Web app launcher" "Browser binary not found for $browser" 2>/dev/null
+  exit 1
+fi
+
+if [[ $mode == app ]]; then
+  exec setsid uwsm-app -- "$exec_bin" --app="$1" "${@:2}"
+else
+  exec setsid uwsm-app -- "$exec_bin" --new-window "$1" "${@:2}"
+fi
