@@ -2,11 +2,7 @@ return {
   {
     "bjarneo/ethereal.nvim",
     priority = 1000,
-  },
-  {
-    "LazyVim/LazyVim",
-    opts = {
-      colorscheme = "ethereal",
-    },
+    lazy = false,
+    config = function() vim.cmd.colorscheme("ethereal") end,
   },
 }

@@ -2,11 +2,7 @@ return {
   {
     "OldJobobo/retro-82.nvim",
     priority = 1000,
-  },
-  {
-    "LazyVim/LazyVim",
-    opts = {
-      colorscheme = "retro-82",
-    },
+    lazy = false,
+    config = function() vim.cmd.colorscheme("retro-82") end,
   },
 }

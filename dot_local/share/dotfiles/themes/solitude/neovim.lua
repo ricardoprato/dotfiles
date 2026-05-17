@@ -1,9 +1,8 @@
 return {
-  { "ficcdaf/ashen.nvim" },
   {
-    "LazyVim/LazyVim",
-    opts = {
-      colorscheme = "ashen",
-    },
-  }
+    "ficcdaf/ashen.nvim",
+    priority = 1000,
+    lazy = false,
+    config = function() vim.cmd.colorscheme("ashen") end,
+  },
 }

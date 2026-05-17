@@ -1,9 +1,8 @@
 return {
-	{ "rebelot/kanagawa.nvim" },
-	{
-		"LazyVim/LazyVim",
-		opts = {
-			colorscheme = "kanagawa",
-		},
-	},
+  {
+    "rebelot/kanagawa.nvim",
+    priority = 1000,
+    lazy = false,
+    config = function() vim.cmd.colorscheme("kanagawa") end,
+  },
 }
