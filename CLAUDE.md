@@ -68,7 +68,6 @@ Env vars (set in `dot_config/uwsm/env`): `DOTFILES_PATH=~/.local/share/dotfiles`
 | `hyprland-preview-share-picker.css.tpl` | `~/.config/hyprland-preview-share-picker/theme.css` |
 | `keyboard.rgb.tpl` | `~/.local/state/dotfiles/theme-keyboard.rgb` |
 | `starship.toml.tpl` | `~/.config/starship.toml` (starship has no include mechanism; template owns the full config) |
-| `zen.css.tpl` | `~/.config/zen/userChrome.css` (push handler symlinks into each `~/.zen/<profile>/chrome/`) |
 
 ### Pull vs push consumers
 
@@ -81,7 +80,6 @@ Env vars (set in `dot_config/uwsm/env`): `DOTFILES_PATH=~/.local/share/dotfiles`
 - `omarchy-theme-set-obsidian` — copies CSS into Obsidian vault theme dir
 - `omarchy-theme-set-keyboard-{asus-rog,f16}` — sends RGB to hardware-specific tools
 - `omarchy-theme-set-foot` — sends OSC escapes to running foot windows (live update — pull-pattern fallback for fresh windows still works)
-- `omarchy-theme-set-zen` — symlinks `~/.config/zen/userChrome.css` into each `~/.zen/<profile>/chrome/` and patches that profile's `user.js` to set `toolkit.legacyUserProfileCustomizations.stylesheets = true` (required for zen to load `userChrome.css`). zen must be restarted to pick up changes (no live-reload mechanism)
 
 ### Adding a new theme
 
