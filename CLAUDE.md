@@ -40,6 +40,36 @@ When omarchy bins reference paths, they use:
 
 When you need to adapt an omarchy script or default, edit it in place. Reference the pre-fork upstream state via `~/dotfiles-backup-2026-05-17/omarchy-upstream.tar.zst`.
 
+## Per-app flat migration: silent-include trap
+
+The migration from upstream omarchy's `~/.local/share/omarchy/default/<app>/` to per-app flat `~/.config/<app>/default/` is shape-incomplete — scripts, templates, and configs may still reference the old path. These **fail silently**: every consumer tolerates a missing include/config and falls back to built-in defaults. Observed symptoms in this fork:
+
+- mako include missing → `default-timeout=0` built-in → notifications never expire
+- walker `additional_theme_location` missing → only bundled themes load
+- alacritty/ghostty screensaver `--config-file` missing → terminal's internal defaults silently win
+
+Before editing any path reference, sweep for residual refs across the chezmoi source:
+
+```bash
+grep -rn "share/omarchy/default/" $(chezmoi source-path) \
+  | grep -v "CLAUDE\|SKILL\|.planning"
+```
+
+Already migrated (do not re-introduce old path):
+
+- `dot_local/share/omarchy/themed/mako.ini.tpl` → `~/.config/mako/default/core.ini`
+- `dot_config/walker/config.toml` → `~/.config/walker/default/themes/`
+- `dot_local/bin/executable_omarchy-launch-screensaver` (alacritty + ghostty cases) → `~/.config/<app>/default/screensaver*`
+
+`dot_local/share/omarchy/omarchy-skill/SKILL.md` still references the upstream layout. It is documentation for an external Claude skill, **intentionally not updated** — do not touch.
+
+## Service quirks
+
+- **Walker has no systemd unit in this fork.** `omarchy-restart-walker` will print `Unable to restart Walker -- RESTART MANUALLY` because it expects `app-walker@autostart.service`. Walker actually runs via D-Bus activation from `dot_config/walker/default/walker.desktop`. To restart after config changes:
+  ```bash
+  pkill -x walker && setsid -f walker --gapplication-service
+  ```
+
 ## Constraints
 
 - Arch / Hyprland / Wayland
