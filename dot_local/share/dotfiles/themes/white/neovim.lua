@@ -2,11 +2,7 @@ return {
   {
     "bjarneo/white.nvim",
     priority = 1000,
-  },
-  {
-    "LazyVim/LazyVim",
-    opts = {
-      colorscheme = "white",
-    },
+    lazy = false,
+    config = function() vim.cmd.colorscheme("white") end,
   },
 }

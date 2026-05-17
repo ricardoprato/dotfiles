@@ -2,11 +2,7 @@ return {
   {
     "bjarneo/vantablack.nvim",
     priority = 1000,
-  },
-  {
-    "LazyVim/LazyVim",
-    opts = {
-      colorscheme = "vantablack",
-    },
+    lazy = false,
+    config = function() vim.cmd.colorscheme("vantablack") end,
   },
 }
