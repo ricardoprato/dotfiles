@@ -1,0 +1,5 @@
+gui:
+  border: "single"
+  returnImmediately: true
+  showAllContainers: true
+  containerStatusHealthStyle: "short"

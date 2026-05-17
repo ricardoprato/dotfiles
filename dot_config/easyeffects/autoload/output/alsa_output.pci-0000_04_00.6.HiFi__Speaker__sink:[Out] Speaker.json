@@ -1,0 +1,6 @@
+{
+    "device": "alsa_output.pci-0000_04_00.6.HiFi__Speaker__sink",
+    "device-description": "Family 17h/19h/1ah HD Audio Controller Speaker",
+    "device-profile": "[Out] Speaker",
+    "preset-name": "tv-mode"
+}
