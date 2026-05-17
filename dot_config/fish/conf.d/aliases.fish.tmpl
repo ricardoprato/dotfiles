@@ -32,4 +32,31 @@ if status is-interactive
     if test "$TERM" = "xterm-kitty"
         abbr ssh 'kitty +kitten ssh'
     end
+
+    ###############################################################################
+    # Ported from omarchy/system/bash/aliases                                      #
+    ###############################################################################
+
+    # Tools
+    abbr c 'opencode'
+    abbr cx 'printf "\033[2J\033[3J\033[H" && claude --permission-mode bypassPermissions'
+    abbr d 'docker'
+    abbr r 'rails'
+    abbr t 'tmux attach; or tmux new -s Work'
+    abbr ic 'tdl c'
+    abbr ix 'tdl cx'
+    abbr icx 'tdl c cx'
+
+    # Git
+    abbr g 'git'
+    abbr gcm 'git commit -m'
+    abbr gcam 'git commit -a -m'
+    abbr gcad 'git commit -a --amend'
+
+    # fzf (preview via $FZF_DEFAULT_OPTS in env.fish)
+    abbr ff 'fzf'
+    abbr eff '$EDITOR (fzf)'
+
+    # Compression
+    abbr decompress 'tar -xzf'
 end

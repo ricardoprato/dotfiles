@@ -1,7 +1,12 @@
 #!/bin/bash
 
-# omarchy:summary=Restart an application by killing it and relaunching via uwsm.
+# omarchy:summary=Restart an application — prefer user systemd unit, fall back to pkill+uwsm.
 # omarchy:args=<application-name> [application-args...]
 
-pkill -x $1
+unit="$1.service"
+if /usr/bin/systemctl --user list-unit-files --quiet "$unit" 2>/dev/null | /usr/bin/grep -q "^$unit"; then
+  exec /usr/bin/systemctl --user restart "$unit"
+fi
+
+pkill -x "$1"
 setsid uwsm-app -- "$@" >/dev/null 2>&1 &

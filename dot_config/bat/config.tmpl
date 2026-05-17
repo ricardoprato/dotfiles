@@ -1,0 +1,18 @@
+# bat config -- theme is rendered by chezmoi from current omarchy theme.
+# Re-render on theme switch via: chezmoi apply ~/.config/bat/config
+# (omarchy-restart-bat hook does this automatically).
+
+{{ $name := "" -}}
+{{- $themeFile := joinPath .chezmoi.homeDir ".config/omarchy/current/theme.name" -}}
+{{- if stat $themeFile -}}
+  {{- $name = trim (include $themeFile) -}}
+{{- end -}}
+{{- $batTheme := "OneHalfDark" -}}
+{{- if eq $name "catppuccin" -}}{{- $batTheme = "Catppuccin Mocha" -}}
+{{- else if eq $name "catppuccin-latte" -}}{{- $batTheme = "Catppuccin Latte" -}}
+{{- else if eq $name "gruvbox" -}}{{- $batTheme = "gruvbox-dark" -}}
+{{- else if eq $name "nord" -}}{{- $batTheme = "Nord" -}}
+{{- else if or (eq $name "white") (eq $name "flexoki-light") -}}{{- $batTheme = "OneHalfLight" -}}
+{{- end }}
+--theme="{{ $batTheme }}"
+--style numbers,changes

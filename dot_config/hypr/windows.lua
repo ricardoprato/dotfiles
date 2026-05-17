@@ -18,6 +18,14 @@ hl.window_rule({
   no_focus = true,
 })
 
+-- Hide xwaylandvideobridge artefact window (Hyprland official fix).
+-- Opacity=0 + no_focus + no_initial_focus is enough to mask it.
+o.window("xwaylandvideobridge", {
+  opacity = "0.0 override 0.0",
+  no_initial_focus = true,
+  no_focus = true,
+})
+
 -- App-specific tweaks (may remove default-opacity tag).
 require("hypr.apps")
 
