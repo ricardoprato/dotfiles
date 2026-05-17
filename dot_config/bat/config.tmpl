@@ -1,6 +1,6 @@
 # bat config -- theme is rendered by chezmoi from current omarchy theme.
 # Re-render on theme switch via: chezmoi apply ~/.config/bat/config
-# (omarchy-restart-bat hook does this automatically).
+# (restart-bat hook does this automatically).
 
 {{ $name := "" -}}
 {{- $themeFile := joinPath .chezmoi.homeDir ".config/omarchy/current/theme.name" -}}
