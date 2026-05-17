@@ -1,0 +1,12 @@
+# Externally-managed git repos that chezmoi clones/pulls on apply.
+# These keep their own .git directory and standalone workflow (cd ~/.config/<repo>; git push)
+# while being declared as part of the bootstrap source-of-truth.
+
+[".config/nvim"]
+    type = "git-repo"
+    url = "git@github.com:ricardoprato/nvim.git"
+    refreshPeriod = "168h"
+    [".config/nvim".clone]
+        args = ["--branch", "feat/lazy-migration"]
+    [".config/nvim".pull]
+        args = ["--ff-only"]
