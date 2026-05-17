@@ -1,24 +1,34 @@
 -- Learn how to configure Hyprland: https://wiki.hypr.land/Configuring/Start/
 
--- Load user modules from ~/.config and Omarchy defaults from $OMARCHY_PATH.
+-- Make ~/.config Lua modules and omarchy resources requirable.
 package.path = os.getenv("HOME")
   .. "/.config/?.lua;"
   .. (os.getenv("OMARCHY_PATH") or (os.getenv("HOME") .. "/.local/share/omarchy"))
   .. "/?.lua;"
   .. package.path
 
--- All Omarchy default setups
-require("hypr.default.omarchy")
+-- Shared helpers (o.bind/launch/window wrappers, command_from, etc.).
+require("hypr.helpers")
 
--- Change your own setup in these files and override defaults.
-require("hypr.monitors")
-require("hypr.input")
-require("hypr.bindings")
+-- Core configuration.
+require("hypr.envs")
 require("hypr.looknfeel")
+require("hypr.input")
+require("hypr.windows")
+require("hypr.apps")
+require("hypr.monitors")
+require("hypr.bindings")
 require("hypr.autostart")
 
--- Toggle config flags dynamically.
-require("hypr.default.toggles")
+-- Dynamic toggles (rounded corners, single-window aspect ratio, etc.).
+require("hypr.toggles")
 
--- Add any other personal Hyprland configuration below.
--- o.window("qemu", { workspace = "5" })
+-- Current theme overrides.
+do
+  local paths = require("hypr.paths")
+  local theme = io.open(paths.config_home .. "/omarchy/current/theme/hyprland.lua", "r")
+  if theme then
+    theme:close()
+    require("omarchy.current.theme.hyprland")
+  end
+end

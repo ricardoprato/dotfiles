@@ -1,4 +1,4 @@
-local paths = require("hypr.default.paths")
+local paths = require("hypr.paths")
 
 local function require_file_if_exists(path, module)
   local file = io.open(path, "r")
