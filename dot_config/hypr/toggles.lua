@@ -1,5 +1,5 @@
-local paths = require("hypr.default.paths")
-local require_all = require("hypr.default.require_all")
+local paths = require("hypr.paths")
+local require_all = require("hypr.require_all")
 
 local toggles_dir = paths.state_home .. "/omarchy/toggles/hypr"
 package.path = toggles_dir .. "/?.lua;" .. package.path
