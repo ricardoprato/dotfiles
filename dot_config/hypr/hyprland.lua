@@ -26,9 +26,9 @@ require("hypr.toggles")
 -- Current theme overrides.
 do
   local paths = require("hypr.paths")
-  local theme = io.open(paths.config_home .. "/omarchy/current/theme/hyprland.lua", "r")
+  local theme = io.open(paths.config_home .. "/hypr/theme/hyprland.lua", "r")
   if theme then
     theme:close()
-    require("omarchy.current.theme.hyprland")
+    require("hypr.theme.hyprland")
   end
 end

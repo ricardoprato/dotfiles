@@ -1,8 +1,8 @@
 /**
- * Syncs pi's light/dark theme with the active Omarchy theme.
+ * Syncs pi's light/dark theme with the active dotfiles theme.
  *
- * Omarchy light themes include:
- *   ~/.config/omarchy/current/theme/light.mode
+ * Light themes include a marker file:
+ *   ~/.local/state/dotfiles/current-theme-dir/light.mode
  */
 
 import { existsSync } from "node:fs";
@@ -10,7 +10,7 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const home = process.env.HOME ?? "";
-const lightModePath = join(home, ".config/omarchy/current/theme/light.mode");
+const lightModePath = join(home, ".local/state/dotfiles/current-theme-dir/light.mode");
 
 function omarchyPiTheme(): "light" | "dark" {
 	return existsSync(lightModePath) ? "light" : "dark";

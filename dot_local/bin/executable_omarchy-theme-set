@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# omarchy:summary=Apply an Omarchy theme
+# omarchy:summary=Apply a theme by name (renders per-app theme files)
 # omarchy:args=<theme-name>
 # omarchy:examples=omarchy theme list | omarchy theme set "Tokyo Night"
 
@@ -9,47 +9,44 @@ if [[ -z $1 ]]; then
   exit 1
 fi
 
-CURRENT_THEME_PATH="$HOME/.config/omarchy/current/theme"
-NEXT_THEME_PATH="$HOME/.config/omarchy/current/next-theme"
-USER_THEMES_PATH="$HOME/.config/omarchy/themes"
-OMARCHY_THEMES_PATH="$OMARCHY_PATH/themes"
+DOTFILES_PATH=${DOTFILES_PATH:-$HOME/.local/share/dotfiles}
+DOTFILES_STATE_PATH=${DOTFILES_STATE_PATH:-$HOME/.local/state/dotfiles}
+
+THEMES_PATH="$DOTFILES_PATH/themes"
+USER_THEMES_PATH="$HOME/.config/dotfiles/themes"
 
 THEME_NAME=$(echo "$1" | sed -E 's/<[^>]+>//g' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
 
-if [[ ! -d $OMARCHY_THEMES_PATH/$THEME_NAME ]] && [[ ! -d $USER_THEMES_PATH/$THEME_NAME ]]; then
+# Resolve theme dir (user override beats bundled)
+if [[ -d $USER_THEMES_PATH/$THEME_NAME ]]; then
+  THEME_DIR="$USER_THEMES_PATH/$THEME_NAME"
+elif [[ -d $THEMES_PATH/$THEME_NAME ]]; then
+  THEME_DIR="$THEMES_PATH/$THEME_NAME"
+else
   echo "Theme '$THEME_NAME' does not exist"
   exit 1
 fi
 
-# Setup clean next theme directory (for atomic theme config swapping)
-rm -rf "$NEXT_THEME_PATH"
-mkdir -p "$NEXT_THEME_PATH"
+mkdir -p "$DOTFILES_STATE_PATH"
 
-# Copy official theme first, then overlay user customizations on top
-cp -r "$OMARCHY_THEMES_PATH/$THEME_NAME/"* "$NEXT_THEME_PATH/" 2>/dev/null
-cp -r "$USER_THEMES_PATH/$THEME_NAME/"* "$NEXT_THEME_PATH/" 2>/dev/null
+# Point state at the active theme's source dir (renderer + bg scripts read from here)
+ln -snf "$THEME_DIR" "$DOTFILES_STATE_PATH/current-theme-dir"
+echo "$THEME_NAME" >"$DOTFILES_STATE_PATH/current-theme"
 
 # Generate colors.toml from alacritty.toml if theme is missing colors.toml
-if [[ ! -f $NEXT_THEME_PATH/colors.toml && -f $NEXT_THEME_PATH/alacritty.toml ]]; then
-  omarchy-theme-colors-from-alacritty "$NEXT_THEME_PATH"
+if [[ ! -f $THEME_DIR/colors.toml && -f $THEME_DIR/alacritty.toml ]]; then
+  omarchy-theme-colors-from-alacritty "$THEME_DIR"
 fi
 
-# Generate dynamic configs
+# Render all templates → per-app destinations
 omarchy-theme-set-templates
 
-# Swap next theme in as current
-rm -rf "$CURRENT_THEME_PATH"
-mv "$NEXT_THEME_PATH" "$CURRENT_THEME_PATH"
-
-# Store theme name for reference
-echo "$THEME_NAME" >"$HOME/.config/omarchy/current/theme.name"
-
-# Change background with theme
+# Background
 if [[ $OMARCHY_THEME_SKIP_BACKGROUND != "1" ]]; then
   omarchy-theme-bg-next
 fi
 
-# Restart components to apply new theme
+# Reload pull-pattern consumers
 if pgrep -x waybar >/dev/null; then
   omarchy-restart-waybar
 fi
@@ -60,9 +57,10 @@ omarchy-restart-btop
 restart-bat
 omarchy-restart-opencode
 omarchy-restart-mako
+omarchy-restart-walker
 omarchy-restart-helix
 
-# Change app-specific themes
+# Push-pattern handlers (apps without include/source mechanism, plus foot live-OSC update)
 omarchy-theme-set-foot
 omarchy-theme-set-gnome
 omarchy-theme-set-browser
@@ -70,8 +68,6 @@ omarchy-theme-set-vscode
 omarchy-theme-set-obsidian
 omarchy-theme-set-keyboard
 
-# Call hook on theme set
+# Hook + bg cache
 omarchy-hook theme-set "$THEME_NAME" >/dev/null
-
-# Warm the background selector cache after the theme is applied, off the critical path.
 omarchy-theme-bg-cache >/dev/null 2>&1 &
