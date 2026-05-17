@@ -1,9 +1,9 @@
-# bat config -- theme is rendered by chezmoi from current omarchy theme.
+# bat config -- theme is rendered by chezmoi from the active dotfiles theme.
 # Re-render on theme switch via: chezmoi apply ~/.config/bat/config
 # (restart-bat hook does this automatically).
 
 {{ $name := "" -}}
-{{- $themeFile := joinPath .chezmoi.homeDir ".config/omarchy/current/theme.name" -}}
+{{- $themeFile := joinPath .chezmoi.homeDir ".local/state/dotfiles/current-theme" -}}
 {{- if stat $themeFile -}}
   {{- $name = trim (include $themeFile) -}}
 {{- end -}}

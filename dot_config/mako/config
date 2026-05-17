@@ -1,0 +1,2 @@
+include=~/.config/mako/default/core.ini
+include=~/.config/mako/theme.ini

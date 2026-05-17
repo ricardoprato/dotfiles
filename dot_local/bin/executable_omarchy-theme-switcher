@@ -2,10 +2,11 @@
 
 # omarchy:summary=Open the Omarchy theme switcher
 
-OMARCHY_PATH=${OMARCHY_PATH:-$HOME/.local/share/omarchy}
-USER_THEMES_PATH="$HOME/.config/omarchy/themes"
-OMARCHY_THEMES_PATH="$OMARCHY_PATH/themes"
-CACHE_PATH="${XDG_CACHE_HOME:-$HOME/.cache}/omarchy/theme-selector"
+DOTFILES_PATH=${DOTFILES_PATH:-$HOME/.local/share/dotfiles}
+DOTFILES_STATE_PATH=${DOTFILES_STATE_PATH:-$HOME/.local/state/dotfiles}
+USER_THEMES_PATH="$HOME/.config/dotfiles/themes"
+OMARCHY_THEMES_PATH="$DOTFILES_PATH/themes"
+CACHE_PATH="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/theme-selector"
 preview_dir="$CACHE_PATH/previews"
 signature_file="$CACHE_PATH/signature"
 
@@ -81,7 +82,7 @@ if [[ ! -f $signature_file ]] || ! cmp -s "$signature_file" <(printf '%s' "$them
   printf '%s' "$theme_signature" >"$signature_file"
 fi
 
-current_theme=$(cat "$HOME/.config/omarchy/current/theme.name" 2>/dev/null)
+current_theme=$(cat "$DOTFILES_STATE_PATH/current-theme" 2>/dev/null)
 selected_preview=""
 for extension in png jpg jpeg webp gif bmp; do
   if [[ -e $preview_dir/$current_theme.$extension ]]; then

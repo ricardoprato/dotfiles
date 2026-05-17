@@ -4,6 +4,10 @@
 export OMARCHY_PATH=$HOME/.local/share/omarchy
 export PATH=$OMARCHY_PATH/bin:$PATH:$HOME/.local/bin
 
+# Theming pipeline (decoupled from omarchy namespace)
+export DOTFILES_PATH=$HOME/.local/share/dotfiles
+export DOTFILES_STATE_PATH=$HOME/.local/state/dotfiles
+
 # Set default terminal and editor
 source ~/.config/uwsm/default
 

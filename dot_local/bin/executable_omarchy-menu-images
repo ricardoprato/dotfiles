@@ -216,7 +216,7 @@ fi
 
 rows_payload=${rows//$'\t'/$'\f'}
 rows_payload=${rows_payload//$'\n'/$'\v'}
-colors_file=${colors_file:-$HOME/.config/omarchy/current/theme/quickshell.json}
+colors_file=${colors_file:-$HOME/.config/quickshell/theme.json}
 colors_payload=""
 
 if [[ -f $colors_file ]]; then

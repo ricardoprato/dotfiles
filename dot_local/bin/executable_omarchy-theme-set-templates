@@ -1,49 +1,68 @@
 #!/bin/bash
 
-# omarchy:summary=Generate themed config files from Omarchy templates
+# omarchy:summary=Render theme templates into per-app destinations
 # omarchy:hidden=true
 
-TEMPLATES_DIR="$OMARCHY_PATH/themed"
-USER_TEMPLATES_DIR="$HOME/.config/omarchy/themed"
-NEXT_THEME_DIR="$HOME/.config/omarchy/current/next-theme"
-COLORS_FILE="$NEXT_THEME_DIR/colors.toml"
+DOTFILES_PATH=${DOTFILES_PATH:-$HOME/.local/share/dotfiles}
+DOTFILES_STATE_PATH=${DOTFILES_STATE_PATH:-$HOME/.local/state/dotfiles}
 
-# Convert hex color to decimal RGB (e.g., "#1e1e2e" -> "30,30,46")
+TEMPLATES_DIR="$DOTFILES_PATH/themed"
+COLORS_FILE="$DOTFILES_STATE_PATH/current-theme-dir/colors.toml"
+
+[[ -f $COLORS_FILE ]] || { echo "colors.toml not found at $COLORS_FILE" >&2; exit 1; }
+
 hex_to_rgb() {
   local hex="${1#\#}"
   printf "%d,%d,%d" "0x${hex:0:2}" "0x${hex:2:2}" "0x${hex:4:2}"
 }
 
-# Only generate dynamic templates for themes with a colors.toml definition
-if [[ -f $COLORS_FILE ]]; then
-  sed_script=$(mktemp)
+# Map a template basename (e.g., "mako.ini.tpl") to its per-app destination.
+# Convention: <app>.<ext>.tpl → ~/.config/<app>/theme.<ext>
+# Exceptions for files whose app dir differs from the template prefix.
+template_target() {
+  local tpl_name="$1"
+  local stripped="${tpl_name%.tpl}"
 
-  while IFS='=' read -r key value; do
-    key="${key//[\"\' ]/}"                # strip quotes and spaces from key
-    [[ $key && $key != \#* ]] || continue # skip empty lines and comments
-    value="${value#*[\"\']}"
-    value="${value%%[\"\']*}" # extract value between quotes (ignores inline comments)
+  case "$stripped" in
+    hyprland.lua)                       echo "$HOME/.config/hypr/theme/hyprland.lua" ;;
+    hyprlock.conf)                      echo "$HOME/.config/hypr/theme/hyprlock.conf" ;;
+    gum_env.lua)                        echo "$HOME/.config/hypr/theme/gum_env.lua" ;;
+    hyprland-preview-share-picker.css)  echo "$HOME/.config/hyprland-preview-share-picker/theme.css" ;;
+    starship.toml)                      echo "$HOME/.config/starship.toml" ;;
+    keyboard.rgb)                       echo "$DOTFILES_STATE_PATH/theme-keyboard.rgb" ;;
+    *)
+      local app="${stripped%%.*}"
+      local ext="${stripped#*.}"
+      echo "$HOME/.config/$app/theme.$ext"
+      ;;
+  esac
+}
 
-    printf 's|{{ %s }}|%s|g\n' "$key" "$value"            # {{ key }} -> value
-    printf 's|{{ %s_strip }}|%s|g\n' "$key" "${value#\#}" # {{ key_strip }} -> value without leading #
-    if [[ $value =~ ^# ]]; then
-      rgb=$(hex_to_rgb "$value")
-      echo "s|{{ ${key}_rgb }}|${rgb}|g"
-    fi
-  done <"$COLORS_FILE" >"$sed_script"
+# Build sed script from colors.toml
+sed_script=$(mktemp)
+trap 'rm -f "$sed_script"' EXIT
 
-  shopt -s nullglob
+while IFS='=' read -r key value; do
+  key="${key//[\"\' ]/}"
+  [[ $key && $key != \#* ]] || continue
+  value="${value#*[\"\']}"
+  value="${value%%[\"\']*}"
 
-  # Process user templates first, then built-in templates (user overrides built-in)
-  for tpl in "$USER_TEMPLATES_DIR"/*.tpl "$TEMPLATES_DIR"/*.tpl; do
-    filename=$(basename "$tpl" .tpl)
-    output_path="$NEXT_THEME_DIR/$filename"
+  printf 's|{{ %s }}|%s|g\n' "$key" "$value"
+  printf 's|{{ %s_strip }}|%s|g\n' "$key" "${value#\#}"
+  if [[ $value =~ ^# ]]; then
+    rgb=$(hex_to_rgb "$value")
+    echo "s|{{ ${key}_rgb }}|${rgb}|g"
+  fi
+done <"$COLORS_FILE" >"$sed_script"
 
-    # Don't overwrite configs already exists in the output directory (copied from theme specific folder)
-    if [[ ! -f $output_path ]]; then
-      sed -f "$sed_script" "$tpl" >"$output_path"
-    fi
-  done
+shopt -s nullglob
 
-  rm "$sed_script"
-fi
+# Render each template to its per-app target. Create parent dirs as needed.
+for tpl in "$TEMPLATES_DIR"/*.tpl; do
+  tpl_name=$(basename "$tpl")
+  target=$(template_target "$tpl_name")
+
+  mkdir -p "$(dirname "$target")"
+  sed -f "$sed_script" "$tpl" >"$target"
+done

@@ -2,7 +2,7 @@
 --   hypridle, mako, waybar, hyprpolkitagent (replaces polkit-gnome-authentication-agent-1)
 
 o.launch_on_start("fcitx5 --disable notificationitem")
-o.launch_on_start("swaybg -i ~/.config/omarchy/current/background -m fill")
+o.launch_on_start("swaybg -i ~/.local/state/dotfiles/current-background -m fill")
 o.exec_on_start("uwsm app -- hyprsunset")
 o.exec_on_start("omarchy-first-run")
 o.exec_on_start("omarchy-powerprofiles-init")
