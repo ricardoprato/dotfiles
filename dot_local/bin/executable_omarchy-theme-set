@@ -57,7 +57,7 @@ omarchy-restart-swayosd
 omarchy-restart-terminal
 omarchy-restart-hyprctl
 omarchy-restart-btop
-omarchy-restart-bat
+restart-bat
 omarchy-restart-opencode
 omarchy-restart-mako
 omarchy-restart-helix
