@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# omarchy:summary=Re-render bat config from current omarchy theme.
+# Triggered by omarchy-theme-set so bat syntax highlighting follows the theme.
+
+exec chezmoi apply "$HOME/.config/bat/config"

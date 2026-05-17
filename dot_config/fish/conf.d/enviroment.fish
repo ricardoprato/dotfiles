@@ -11,3 +11,7 @@ else if pacman -Qi paru >/dev/null 2>&1
     set aurhelper "paru"
 end
 
+
+# Color man pages with bat (note: bat --theme handled by ~/.config/bat/config template)
+set -gx MANROFFOPT "-c"
+set -gx MANPAGER "sh -c 'col -bx | bat -l man -p'"
