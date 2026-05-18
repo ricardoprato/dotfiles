@@ -68,20 +68,20 @@ Env vars (set in `dot_config/uwsm/env`): `DOTFILES_PATH=~/.local/share/dotfiles`
 | `hyprland-preview-share-picker.css.tpl` | `~/.config/hyprland-preview-share-picker/theme.css` |
 | `keyboard.rgb.tpl` | `~/.local/state/dotfiles/theme-keyboard.rgb` |
 | `starship.toml.tpl` | `~/.config/starship.toml` (starship has no include mechanism; template owns the full config) |
-| `zen.css.tpl` | `~/.config/zen/userChrome.css` (push handler symlinks into each `~/.zen/<profile>/chrome/`) |
 
 ### Pull vs push consumers
 
 **Pull (most apps)** — entry config in `dot_config/<app>/` includes/imports/sources the rendered `theme.<ext>` file. Examples: kitty `include theme.conf`, mako `include=~/.config/mako/theme.ini`, waybar `@import "theme.css"`, hyprlock `source = ~/.config/hypr/theme/hyprlock.conf`. New windows/restart picks up new theme automatically.
 
-**Push (5 handlers)** — apps that can't include external files; theme-set runs a script that pushes colors into the app:
+**Push (6 handlers)** — apps that can't include external files; theme-set runs a script that pushes colors into the app:
 - `omarchy-theme-set-gnome` — `gsettings set`
 - `omarchy-theme-set-browser` — writes `/etc/<browser>/policies/managed/color.json`
 - `omarchy-theme-set-vscode` — patches VS Code `settings.json`
 - `omarchy-theme-set-obsidian` — copies CSS into Obsidian vault theme dir
 - `omarchy-theme-set-keyboard-{asus-rog,f16}` — sends RGB to hardware-specific tools
 - `omarchy-theme-set-foot` — sends OSC escapes to running foot windows (live update — pull-pattern fallback for fresh windows still works)
-- `omarchy-theme-set-zen` — symlinks `~/.config/zen/userChrome.css` into each `~/.zen/<profile>/chrome/` and patches that profile's `user.js` to set `toolkit.legacyUserProfileCustomizations.stylesheets = true` (required for zen to load `userChrome.css`). zen must be restarted to pick up changes (no live-reload mechanism)
+
+Zen/Firefox are intentionally NOT themed: their only customization hook is `userChrome.css` (legacy/deprecated by Mozilla, requires `toolkit.legacyUserProfileCustomizations.stylesheets`). Keeping with upstream omarchy's philosophy — themea solo lo officially-customizable — Zen uses its built-in theme system (`about:preferences` → Themes) or AMO themes.
 
 ### Adding a new theme
 
