@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# omarchy:summary=Fuzzy-pick a folder and open (or focus) it in a kitty tab.
+#
+# Source order: zoxide history (frecency-ranked) → fd from $HOME (depth 4)
+# as fallback. awk dedup preserves order, so frequent dirs surface first.
+#
+# On selection, if any kitty window in the current OS-window already has
+# that cwd, focus it instead of creating a duplicate tab. Otherwise, open
+# a new tab with that cwd.
+#
+# Inside fzf, navigate with Arrow keys or Ctrl+N/Ctrl+P — Ctrl+J/K are
+# intercepted globally by kitty for split navigation.
+
+set -euo pipefail
+
+selected=$(
+  {
+    zoxide query --list 2>/dev/null
+    fd --type d --hidden \
+       --exclude .git --exclude node_modules --exclude .cache \
+       --exclude .venv --exclude target --exclude .worktrees \
+       --exclude .local --exclude .var --exclude .mozilla \
+       --exclude .steam --exclude .wine --exclude .rustup --exclude .cargo \
+       --max-depth 4 \
+       . "$HOME" 2>/dev/null
+  } | awk 'NF && !seen[$0]++' \
+    | fzf --prompt 'dir > ' --height 40% --reverse --no-mouse
+)
+
+[ -n "$selected" ] || exit 0
+
+# Strip trailing slash so kitty cwd comparison is stable. We deliberately
+# do NOT canonicalize via realpath: zoxide and fish both store logical
+# paths (pwd -L), and kitty's OSC 7 reports the same — canonicalizing
+# could turn a symlinked match into a miss.
+selected="${selected%/}"
+
+# Dedup: find an existing window in the CURRENT OS-window whose cwd
+# matches the selection. jq returns the first matching window id (or empty).
+existing_id=$(
+  kitty @ ls 2>/dev/null \
+    | jq -r --arg cwd "$selected" '
+        .[] | select(.is_focused == true) | .tabs[] | .windows[] |
+        select(.cwd == $cwd) | .id
+      ' \
+    | head -n1
+)
+
+if [ -n "$existing_id" ]; then
+  kitty @ focus-window --match "id:$existing_id"
+else
+  kitty @ launch --type=tab --cwd="$selected"
+fi
