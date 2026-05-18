@@ -19,11 +19,17 @@ hl.window_rule({
 })
 
 -- Hide xwaylandvideobridge artefact window (Hyprland official fix).
--- Opacity=0 + no_focus + no_initial_focus is enough to mask it.
+-- Full canonical rule from wiki.hypr.land/Useful Utilities/Screen-Sharing.
+-- Must opt out of default-opacity tag (line 33) or the catch-all opacity rule
+-- overrides this one.
 o.window("xwaylandvideobridge", {
+  tag = "-default-opacity",
   opacity = "0.0 override 0.0",
   no_initial_focus = true,
   no_focus = true,
+  no_anim = true,
+  no_blur = true,
+  max_size = "1 1",
 })
 
 -- App-specific tweaks (may remove default-opacity tag).
