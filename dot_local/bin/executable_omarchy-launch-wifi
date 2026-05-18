@@ -1,6 +1,11 @@
 #!/bin/bash
 
 # omarchy:summary=Launch the Omarchy wifi controls (provided by the Impala TUI).
+# Impala checks geteuid() == 0 before allowing "share network" — runs via sudo
+# so that feature works. Requires /etc/sudoers.d/impala granting NOPASSWD.
 
 rfkill unblock wifi
-omarchy-launch-or-focus-tui impala
+
+APP_ID="org.omarchy.impala"
+LAUNCH_COMMAND="uwsm-app -- xdg-terminal-exec --app-id=$APP_ID -e sudo /usr/bin/impala"
+exec omarchy-launch-or-focus "$APP_ID" "$LAUNCH_COMMAND"
