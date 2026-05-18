@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# omarchy:summary=Distribute the rendered zen userChrome.css to each zen profile + enable legacy stylesheets pref
+# omarchy:hidden=true
+
+USERCHROME="$HOME/.config/zen/userChrome.css"
+ZEN_ROOT="$HOME/.zen"
+
+[[ -f $USERCHROME ]] || exit 0
+[[ -d $ZEN_ROOT ]] || exit 0
+
+# Iterate each profile dir (skip non-profile entries like Crash Reports, Profile Groups, installs.ini)
+while IFS= read -r -d '' profile_dir; do
+  # Only treat dirs that contain a profile marker (prefs.js or times.json)
+  [[ -f $profile_dir/prefs.js || -f $profile_dir/times.json ]] || continue
+
+  chrome_dir="$profile_dir/chrome"
+  mkdir -p "$chrome_dir"
+
+  target="$chrome_dir/userChrome.css"
+
+  # Symlink to the central rendered file. If a real file exists, back it up first.
+  if [[ -L $target ]]; then
+    ln -snf "$USERCHROME" "$target"
+  elif [[ -e $target ]]; then
+    mv "$target" "$target.backup-$(date +%s)"
+    ln -snf "$USERCHROME" "$target"
+  else
+    ln -snf "$USERCHROME" "$target"
+  fi
+
+  # Enable userChrome.css loading via user.js (zen reads user.js on top of prefs.js)
+  user_js="$profile_dir/user.js"
+  pref_line='user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);'
+
+  if ! [[ -f $user_js ]] || ! grep -qF "$pref_line" "$user_js"; then
+    {
+      grep -v "toolkit.legacyUserProfileCustomizations.stylesheets" "$user_js" 2>/dev/null
+      echo "$pref_line"
+    } > "$user_js.tmp" && mv "$user_js.tmp" "$user_js"
+  fi
+done < <(find "$ZEN_ROOT" -mindepth 1 -maxdepth 1 -type d -print0)

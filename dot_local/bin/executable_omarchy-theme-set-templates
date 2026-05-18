@@ -29,6 +29,7 @@ template_target() {
     gum_env.lua)                        echo "$HOME/.config/hypr/theme/gum_env.lua" ;;
     hyprland-preview-share-picker.css)  echo "$HOME/.config/hyprland-preview-share-picker/theme.css" ;;
     starship.toml)                      echo "$HOME/.config/starship.toml" ;;
+    zen.css)                            echo "$HOME/.config/zen/userChrome.css" ;;
     keyboard.rgb)                       echo "$DOTFILES_STATE_PATH/theme-keyboard.rgb" ;;
     *)
       local app="${stripped%%.*}"
