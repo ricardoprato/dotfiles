@@ -1,34 +1,66 @@
-;; defsrc is still necessary
+;; kanata config — home row mods (GACS) + escape/ctrl en caps + gaming-mode toggle
+;;
+;; Docs: https://github.com/jtroo/kanata/blob/main/docs/config.adoc
+;;
+;; Service control:
+;;   systemctl --user restart kanata   ;; tras editar este archivo
+;;   systemctl --user stop kanata      ;; pausa, vuelve a teclado normal
+;;   systemctl --user start kanata     ;; reanudar
+;;
+;; Panic exit (combo de emergencia, refiere a teclas FÍSICAS pre-remap):
+;;   Ctrl + Espacio + Esc
+
 (defcfg
   process-unmapped-keys yes
 )
 
+;; Solo las teclas que vamos a reescribir. El resto del teclado pasa intacto.
 (defsrc
-  caps a s d f j k l ; grv
+  caps  a  s  d  f    j  k  l  scln  grv
 )
+
 (defvar
-  tap-time 150
+  ;; Tap = pulsación rápida (letra normal). Hold = mantenida (modifier).
+  ;; Si los mods se disparan al tipear rápido, subí hold-time a 220-250.
+  ;; Si sentís lag al usar mods, bajá tap-time.
+  tap-time  150
   hold-time 200
 )
 
 (defalias
+  ;; Caps Lock: tap = Escape (vim, salir de modales), hold = Ctrl
   escctrl (tap-hold $tap-time $hold-time esc lctl)
-  a (multi f24 (tap-hold $tap-time $hold-time a lmet))
-  s (multi f24 (tap-hold $tap-time $hold-time s lalt))
-  d (multi f24 (tap-hold $tap-time $hold-time d lsft))
-  f (multi f24 (tap-hold $tap-time $hold-time f lctl))
-  j (multi f24 (tap-hold $tap-time $hold-time j rctl))
-  k (multi f24 (tap-hold $tap-time $hold-time k rsft))
-  l (multi f24 (tap-hold $tap-time $hold-time l ralt)
-  ; (multi f24 (tap-hold $tap-time $hold-time ; rmet))
-  gaming-mode (tap-tap-toggle grv gaming)
+
+  ;; Home row mods — convención GACS:
+  ;;   meñique = Meta(Super)   anular = Alt   medio = Ctrl   índice = Shift
+  ;;
+  ;; Razón GACS: Shift se usa más que Ctrl (toda mayúscula, !?¿:"' en latam),
+  ;; el índice es el dedo más fuerte, le toca el mod más frecuente.
+  ;;
+  ;; Para volver a GASC (Ctrl en índice como dreamsofcode/Omarchy original):
+  ;; intercambiar lsft↔lctl en (d, f) y rsft↔rctl en (j, k).
+  a    (tap-hold $tap-time $hold-time a    lmet)
+  s    (tap-hold $tap-time $hold-time s    lalt)
+  d    (tap-hold $tap-time $hold-time d    lctl)
+  f    (tap-hold $tap-time $hold-time f    lsft)
+  j    (tap-hold $tap-time $hold-time j    rsft)
+  k    (tap-hold $tap-time $hold-time k    rctl)
+  l    (tap-hold $tap-time $hold-time l    ralt)
+  scln (tap-hold $tap-time $hold-time scln rmet)
+
+  ;; Doble-tap en backtick (`) alterna a capa "gaming" — desactiva los mods
+  ;; para que WASD vuelva a ser instantáneo. Otro doble-tap vuelve.
+  gaming-mode (tap-dance 200 (grv (layer-switch gaming)))
+  base-mode   (tap-dance 200 (grv (layer-switch base)))
 )
 
+;; Capa base — la que usás siempre para programar/escribir
 (deflayer base
-  @escctrl @a @s @d @f @j @k @l @; @gaming-mode
+  @escctrl  @a @s @d @f    @j @k @l @scln  @gaming-mode
 )
 
+;; Capa gaming — letras normales sin tap-hold (WASD responde instantáneo)
+;; Para entrar/salir: doble-tap en ` (backtick)
 (deflayer gaming
-  @escctrl a s d f j k l ; @gaming-mode
+  @escctrl  a s d f    j k l ;    @base-mode
 )
-

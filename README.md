@@ -124,6 +124,50 @@ sudo pacman -S ydotool    # required by output.mode = "type" (simulates kbd inpu
 
 For Spanish dictation, edit `dot_config/voxtype/config.toml`: `model = "small"`, `language = "es"`.
 
+## Keyboard remapping (kanata)
+
+[kanata](https://github.com/jtroo/kanata) is a kernel-level (uinput) keyboard remapper. Config lives in `dot_config/kanata/config.kbd`; service unit in `dot_config/systemd/user/kanata.service`; auto-enabled via `dot_config/systemd/user/default.target.wants/kanata.service` symlink.
+
+What this fork's config does:
+
+- **Caps Lock** → tap = Escape, hold = Ctrl
+- **Home row mods (GACS)** — hold a letter on home row = modifier:
+  - Left:  `a`=Super, `s`=Alt, `d`=Ctrl, `f`=Shift
+  - Right: `j`=Shift, `k`=Ctrl, `l`=Alt, `;`=Super
+- **Double-tap `` ` ``** → toggles a `gaming` layer that disables tap-hold (WASD instant); double-tap again to return.
+
+Tap/hold timing: `tap-time 150` / `hold-time 200` (ms). If mods fire while typing fast, raise `hold-time` to 220–250.
+
+Binary not in base Arch — install path:
+
+```bash
+yay -S kanata-bin   # precompiled, avoids cargo build
+
+# udev rule for /dev/uinput access — system-level, not chezmoi-tracked.
+# Reference copy lives in system/udev/50-kanata.rules.
+sudo cp ~/.local/share/chezmoi/system/udev/50-kanata.rules /etc/udev/rules.d/
+sudo groupadd -f uinput
+sudo usermod -aG input,uinput "$USER"
+sudo udevadm control --reload-rules && sudo udevadm trigger
+# Re-login (or reboot) so the group change takes effect.
+
+# Service was auto-enabled by chezmoi apply (default.target.wants symlink);
+# just (re)start it on first boot:
+systemctl --user daemon-reload
+systemctl --user restart kanata
+```
+
+Verify:
+
+```bash
+systemctl --user status kanata   # expect: active (running)
+# Test: Caps tap = Esc in nvim; hold f + c = Ctrl+C in terminal.
+```
+
+Emergency exit (in case mods misbehave): physical `Ctrl + Space + Esc` kills the daemon instantly — those keys refer to the BEFORE-remap physical layout, so Caps→Ctrl does NOT count here, use the real Ctrl key.
+
+Pause without disabling: `systemctl --user stop kanata`. Resume: `systemctl --user start kanata`. After editing `config.kbd`: `systemctl --user restart kanata`.
+
 ## Workflow
 
 Single branch `main-omarchy`. Edit in source, apply, commit:
