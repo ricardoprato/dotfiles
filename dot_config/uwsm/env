@@ -8,6 +8,10 @@ export PATH=$OMARCHY_PATH/bin:$PATH:$HOME/.local/bin
 export DOTFILES_PATH=$HOME/.local/share/dotfiles
 export DOTFILES_STATE_PATH=$HOME/.local/state/dotfiles
 
+# OCR languages for omarchy-capture-text-extraction (tesseract -l). Requires
+# tesseract-data-<lang> installed per language.
+export OMARCHY_OCR_LANGS=eng+spa
+
 # Set default terminal and editor
 source ~/.config/uwsm/default
 

@@ -82,6 +82,35 @@ Verify: `xdg-settings get default-web-browser` returns `brave-browser.desktop`, 
 
 To switch back to a different browser later: re-run step 2 with the new `*.desktop` name. `omarchy-launch-browser` and `omarchy-launch-webapp` both resolve dynamically via `xdg-settings get`, so no dotfile edits are needed.
 
+## Capture tooling (screenrecord + OCR)
+
+The `omarchy-capture-*` scripts wired in `dot_config/hypr/bindings.lua` orchestrate `hyprpicker` + `slurp` + a tool-specific binary. The tool-specific binaries are NOT pulled in by base Arch / Hyprland — they need explicit install. Failures are silent (stderr piped to `/dev/null`, scripts `exit 1` without notify), so a missing package looks identical to "shortcut does nothing".
+
+```bash
+# Screen recording  (ALT + PRINT → screenrecord menu → omarchy-capture-screenrecording)
+yay -S gpu-screen-recorder
+
+# OCR text extraction  (SUPER + CTRL + PRINT → omarchy-capture-text-extraction)
+sudo pacman -S tesseract-data-eng
+# tesseract-data-spa is already pulled in by base; OMARCHY_OCR_LANGS=eng+spa
+# (in dot_config/uwsm/env) requires BOTH lang packs — tesseract aborts if any
+# requested lang is missing, it does not degrade to "whatever is installed".
+```
+
+Verify after install:
+
+```bash
+tesseract --list-langs        # expect: eng, osd, spa
+which gpu-screen-recorder     # expect: /usr/bin/gpu-screen-recorder
+```
+
+`XDG_VIDEOS_DIR` quirk: `~/.config/user-dirs.dirs` may ship pointing at `$HOME/` instead of `$HOME/Videos`. `omarchy-capture-screenrecording` honors it as-is, so recordings land loose in `~`. Fix:
+
+```bash
+mkdir -p ~/Videos
+sed -i 's|^XDG_VIDEOS_DIR=.*|XDG_VIDEOS_DIR="$HOME/Videos"|' ~/.config/user-dirs.dirs
+```
+
 ## Workflow
 
 Single branch `main-omarchy`. Edit in source, apply, commit:
