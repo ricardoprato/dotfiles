@@ -365,7 +365,11 @@ show_setup_menu() {
 }
 
 show_setup_power_menu() {
-  profile=$(menu "Power Profile" "$(omarchy-powerprofiles-list)" "" "$(powerprofilesctl get)")
+  local active=$(powerprofilesctl get)
+  local options=$(omarchy-powerprofiles-list | awk -v a="$active" '{ if ($1==a) print "● "$0; else print "  "$0 }')
+  profile=$(menu "Power Profile" "$options" "" "● $active")
+  profile="${profile#● }"
+  profile="${profile#  }"
 
   if [[ $profile == "CNCLD" || -z $profile ]]; then
     back_to show_setup_menu
