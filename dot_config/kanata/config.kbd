@@ -1,4 +1,4 @@
-;; kanata config — home row mods (GACS) + escape/ctrl en caps + gaming-mode toggle
+;; kanata config — home row mods (GASC) + escape/ctrl en caps + gaming-mode toggle
 ;;
 ;; Docs: https://github.com/jtroo/kanata/blob/main/docs/config.adoc
 ;;
@@ -31,25 +31,35 @@
   ;; Caps Lock: tap = Escape (vim, salir de modales), hold = Ctrl
   escctrl (tap-hold $tap-time $hold-time esc lctl)
 
-  ;; Home row mods — convención GACS:
-  ;;   meñique = Meta(Super)   anular = Alt   medio = Ctrl   índice = Shift
+  ;; Home row mods — convención GASC:
+  ;;   meñique = Meta(Super)   anular = Alt   medio = Shift   índice = Ctrl
   ;;
-  ;; Razón GACS: Shift se usa más que Ctrl (toda mayúscula, !?¿:"' en latam),
-  ;; el índice es el dedo más fuerte, le toca el mod más frecuente.
+  ;; Razón GASC: Ctrl es el modifier dominante en este flujo (vim, tmux,
+  ;; shell shortcuts). El índice tiene mejor control fino — le toca Ctrl.
   ;;
-  ;; Para volver a GASC (Ctrl en índice como dreamsofcode/Omarchy original):
+  ;; Para cambiar a GACS (Shift en índice — Miryoku/Manna-Harbour default):
   ;; intercambiar lsft↔lctl en (d, f) y rsft↔rctl en (j, k).
   a    (tap-hold $tap-time $hold-time a    lmet)
   s    (tap-hold $tap-time $hold-time s    lalt)
-  d    (tap-hold $tap-time $hold-time d    lctl)
-  f    (tap-hold $tap-time $hold-time f    lsft)
-  j    (tap-hold $tap-time $hold-time j    rsft)
-  k    (tap-hold $tap-time $hold-time k    rctl)
+  d    (tap-hold $tap-time $hold-time d    lsft)
+  f    (tap-hold $tap-time $hold-time f    lctl)
+  ;; j hold = lctl (no rctl) para no chocar con `compose:rctrl` de xkb.
+  ;; xkb trata Ctrl_L y Ctrl_R idénticos como modifier, pero solo Ctrl_R
+  ;; queda re-mapeado a Multi_key; emitiendo lctl evitamos disparar Compose
+  ;; accidentalmente cuando j se mantiene >hold-time mientras tipeás.
+  j    (tap-hold $tap-time $hold-time j    lctl)
+  k    (tap-hold $tap-time $hold-time k    rsft)
   l    (tap-hold $tap-time $hold-time l    ralt)
   scln (tap-hold $tap-time $hold-time scln rmet)
 
-  ;; Doble-tap en backtick (`) alterna a capa "gaming" — desactiva los mods
-  ;; para que WASD vuelva a ser instantáneo. Otro doble-tap vuelve.
+  ;; Doble-tap en la tecla top-left del number row (scancode KEY_GRAVE)
+  ;; alterna a capa "gaming" — desactiva los mods para que WASD vuelva a
+  ;; ser instantáneo. Otro doble-tap vuelve.
+  ;;
+  ;; Caveat en layout latam: esa tecla física NO produce backtick (`); el
+  ;; OS la mapea a `|` (pipe). Single-tap = `|` literal con delay de 200ms
+  ;; (kanata espera por un posible segundo tap antes de soltar la tecla).
+  ;; Se nota en pipes de shell. Para tipear backtick literal usar AltGr+}.
   gaming-mode (tap-dance 200 (grv (layer-switch gaming)))
   base-mode   (tap-dance 200 (grv (layer-switch base)))
 )
