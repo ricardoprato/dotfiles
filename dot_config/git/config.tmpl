@@ -1,8 +1,8 @@
 # See https://git-scm.com/docs/git-config
 
 [user]
-	email = ricardoprato36@gmail.com
-	name = Ricardo Prato
+	email = {{ .email | quote }}
+	name = {{ .name | quote }}
 [core]
 	editor = nvim
 [alias]

@@ -37,6 +37,13 @@ system/                  → /etc/ & system-level (NOT chezmoi-managed, copy man
 chezmoi init --apply ricardoprato/dotfiles
 # Or, if SSH-cloning:
 chezmoi init --apply git@github.com:ricardoprato/dotfiles.git
+#
+# `init` prompts (one-time, stored in machine-local ~/.config/chezmoi/chezmoi.toml,
+# never committed):
+#   - Git author email
+#   - Git author name
+#   - Spotify client ID  (leave empty to skip spotify-player integration)
+# Re-running `chezmoi init` reuses existing answers (promptStringOnce).
 
 # 3. System-level configs (one-off, with sudo)
 sudo cp ~/.local/share/chezmoi/system/grub/grub /etc/default/grub
@@ -131,9 +138,9 @@ For Spanish dictation, edit `dot_config/voxtype/config.toml`: `model = "small"`,
 What this fork's config does:
 
 - **Caps Lock** → tap = Escape, hold = Ctrl
-- **Home row mods (GACS)** — hold a letter on home row = modifier:
-  - Left:  `a`=Super, `s`=Alt, `d`=Ctrl, `f`=Shift
-  - Right: `j`=Shift, `k`=Ctrl, `l`=Alt, `;`=Super
+- **Home row mods (GASC)** — hold a letter on home row = modifier:
+  - Left:  `a`=Super, `s`=Alt, `d`=Shift, `f`=Ctrl
+  - Right: `j`=Ctrl, `k`=Shift, `l`=Alt, `;`=Super
 - **Double-tap `` ` ``** → toggles a `gaming` layer that disables tap-hold (WASD instant); double-tap again to return.
 
 Tap/hold timing: `tap-time 150` / `hold-time 200` (ms). If mods fire while typing fast, raise `hold-time` to 220–250.
@@ -180,6 +187,23 @@ git add -A && git commit -m "..."
 ```
 
 Themes: `omarchy theme set <name>`. Hooks (`omarchy-restart-btop`, `-bat`, `-waybar`, etc.) re-render configs and reload daemons automatically.
+
+## Pre-commit hook (gitleaks)
+
+The repo ships a pre-commit hook at `.githooks/pre-commit` that blocks any commit introducing a detectable secret (API keys, tokens, PEM blocks, etc.). One-time setup per clone:
+
+```bash
+sudo pacman -S gitleaks
+git config core.hooksPath .githooks
+```
+
+After that, every `git commit` runs `gitleaks git --pre-commit --staged` over the diff. A finding aborts the commit; output is redacted (no raw secret echoed to the terminal). Bypass once with `git commit --no-verify` — use sparingly and only for known false positives.
+
+To audit the full history (not just staged changes) before going public:
+
+```bash
+gitleaks git --verbose --redact
+```
 
 ## Conventions
 

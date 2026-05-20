@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Block commits that introduce secrets.
+# Setup: sudo pacman -S gitleaks && git config core.hooksPath .githooks
+# Bypass once (use sparingly): git commit --no-verify
+
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "ERROR: gitleaks not installed." >&2
+    echo "Install: sudo pacman -S gitleaks" >&2
+    exit 1
+fi
+
+exec gitleaks git --pre-commit --staged --verbose --redact
