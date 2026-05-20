@@ -218,4 +218,5 @@ grep -rn "share/omarchy/default/\|omarchy/current/\|share/omarchy/themes\|share/
 - Keyboard layout: latam (`dot_config/hypr/input.lua`)
 - Default terminal: kitty (`dot_config/xdg-terminals.list`)
 - Shell: fish
-- Pending manual install: alacritty, imv, kanata, opencode (configs present, binaries not)
+- Pending manual install: alacritty, imv, opencode (configs present, binaries not)
+- kanata: install steps documented in README ("Keyboard remapping (kanata)"). Binary `kanata-bin` from AUR; udev rule at `system/udev/50-kanata.rules` (reference-only, copy to `/etc/udev/rules.d/`); service auto-enabled via `dot_config/systemd/user/default.target.wants/kanata.service` symlink.
