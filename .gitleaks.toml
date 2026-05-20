@@ -1,0 +1,17 @@
+# Gitleaks config — extends defaults, adds repo-specific allowlist.
+# See https://github.com/gitleaks/gitleaks#configuration
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positives in this repo's history"
+regexes = [
+    # Public Chromium "Linux distros" OAuth client secret. Inherited via the
+    # upstream basecamp/omarchy port — identical value ships in upstream's
+    # bin/omarchy-install-chromium-google-account and in many distro chromium
+    # packages. Not a personal credential. The file no longer exists in the
+    # working tree (deleted in e4d1e47) but is present in history at commits
+    # 9c74fdd and 4638f47.
+    '''OTJgUOQcT7lO7GsGZq2G4IlT''',
+]

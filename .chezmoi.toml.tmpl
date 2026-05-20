@@ -1,0 +1,18 @@
+{{/*
+  Machine-local chezmoi config. Rendered by `chezmoi init` to
+  ~/.config/chezmoi/chezmoi.toml — never committed to the repo.
+
+  promptStringOnce: only asks if the key is not already set, so re-running
+  `chezmoi init` won't clobber existing answers.
+*/ -}}
+
+{{- $email := promptStringOnce . "email" "Git author email" -}}
+{{- $name  := promptStringOnce . "name"  "Git author name" -}}
+{{- $spotifyClientId := promptStringOnce . "spotify.clientId" "Spotify client ID (empty to skip spotify-player integration)" "" -}}
+
+[data]
+    email = {{ $email | quote }}
+    name  = {{ $name  | quote }}
+
+[data.spotify]
+    clientId = {{ $spotifyClientId | quote }}
