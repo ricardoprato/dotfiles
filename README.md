@@ -111,6 +111,19 @@ mkdir -p ~/Videos
 sed -i 's|^XDG_VIDEOS_DIR=.*|XDG_VIDEOS_DIR="$HOME/Videos"|' ~/.config/user-dirs.dirs
 ```
 
+## Optional: dictation (voxtype)
+
+`SUPER + CTRL + X` (toggle) and `F9` (push-to-talk) are pre-wired for [voxtype](https://github.com/jacobwi/voxtype) — local whisper.cpp dictation that types into the active window. Configuration lives in `dot_config/voxtype/config.toml` (default model `base.en`, output mode `type`).
+
+Not installed by default. Install path:
+
+```bash
+omarchy-voxtype-install   # pulls voxtype + downloads the whisper model
+sudo pacman -S ydotool    # required by output.mode = "type" (simulates kbd input)
+```
+
+For Spanish dictation, edit `dot_config/voxtype/config.toml`: `model = "small"`, `language = "es"`.
+
 ## Workflow
 
 Single branch `main-omarchy`. Edit in source, apply, commit:
