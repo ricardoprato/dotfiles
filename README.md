@@ -51,6 +51,37 @@ systemctl --user daemon-reload
 # 5. Reboot into Hyprland session.
 ```
 
+## Default browser (Brave)
+
+Brave is the default for HTTP(S) and for all webapp bindings (`SUPER + SHIFT + *`). Chosen over Zen because it supports Chromium's `--app=<url>` (chromeless PWA windows used by `omarchy-launch-webapp`) and the managed-policy theming hook (`omarchy-theme-set-browser` pushes the active accent into `/etc/brave/policies/managed/color.json`). Zen/Firefox have no equivalent for either.
+
+Wayland flags live in `dot_config/brave-flags.conf` (mirrors `chromium-flags.conf`); Brave reads them automatically on launch.
+
+On a fresh machine, after `chezmoi apply`:
+
+```bash
+# 1. Theme policy dir (required for omarchy-theme-set-browser to push colors)
+sudo mkdir -p /etc/brave/policies/managed
+sudo chmod a+rw /etc/brave/policies/managed
+
+# 2. Default browser + http(s) handlers.
+#    NOTE: `env -u BROWSER` is required because dot_config/uwsm/default
+#    exports BROWSER=omarchy-launch-browser, which makes xdg-utils refuse
+#    to modify the default ("$BROWSER is set and can't be changed").
+#    The env var must stay (it points terminal apps at the wrapper);
+#    we just unset it for these three commands.
+env -u BROWSER xdg-settings set default-web-browser brave-browser.desktop
+env -u BROWSER xdg-mime default brave-browser.desktop x-scheme-handler/http
+env -u BROWSER xdg-mime default brave-browser.desktop x-scheme-handler/https
+
+# 3. Push initial theme color into Brave
+omarchy-theme-refresh
+```
+
+Verify: `xdg-settings get default-web-browser` returns `brave-browser.desktop`, and `SUPER + SHIFT + E` (Google Keep) opens a chromeless window.
+
+To switch back to a different browser later: re-run step 2 with the new `*.desktop` name. `omarchy-launch-browser` and `omarchy-launch-webapp` both resolve dynamically via `xdg-settings get`, so no dotfile edits are needed.
+
 ## Workflow
 
 Single branch `main-omarchy`. Edit in source, apply, commit:
