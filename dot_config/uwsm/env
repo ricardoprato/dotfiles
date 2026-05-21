@@ -15,5 +15,14 @@ export OMARCHY_OCR_LANGS=eng+spa
 # Set default terminal and editor
 source ~/.config/uwsm/default
 
-# Activate mise if present on the system
-omarchy-cmd-present mise && eval "$(mise activate bash --shims)"
+# Mise activation moved out of the session env: shims-at-front-of-PATH was
+# breaking system scripts with `#!/usr/bin/env python3` (e.g. powerprofilesctl
+# in /bin needs system Python's `gi` module — mise's bundled Python lacks it).
+#
+# Mise now activates per-shell via:
+#   - fish: dot_config/fish/conf.d/mise.fish
+#   - other shells: add `mise activate <shell> | source` to their rc.
+#
+# Inside a directory with .mise.toml the shell-level hook prepends the right
+# tool versions. Non-interactive contexts (waybar, hyprland exec_on_start,
+# systemd user services) see only the system PATH — which is what they want.
