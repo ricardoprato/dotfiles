@@ -20,6 +20,7 @@ Each app's configuration lives entirely under its `dot_config/<app>/` dir. omarc
 - `dot_local/share/omarchy/` — non-theming resources only: `applications/` (.desktop launchers), `omarchy-skill/`, `pi/`, `nautilus-python/`, `foot/screensaver.ini`, `LICENSE`, `version`, `icon.*`, `logo.*`
 - `dot_local/share/fonts/omarchy.ttf` — UI icon font (fontconfig discovers it)
 - `dot_local/bin/executable_omarchy-*` — 227 omarchy CLI scripts (pruned: dev, install, refresh, remove, reinstall, hw-specific)
+- `dot_local/bin/executable_<name>` (no `omarchy-` prefix) — our own scripts, written for this fork. Examples: `kitty-tab-picker` (Alt+D fuzzy folder picker, bound in `dot_config/kitty/kitty.conf`), `restart-bat` (bat cache refresh helper)
 - `dot_tmux.conf` → `~/.tmux.conf`
 - `dot_XCompose` → `~/.XCompose`
 - `private_dot_ssh/` → `~/.ssh/` (mode 0700)
@@ -187,6 +188,21 @@ When omarchy bins reference paths, they use:
 - `$HOME/.config/<app>/theme.<ext>` for rendered theme output
 
 When you need to adapt an omarchy script or default, edit it in place. Reference the pre-fork upstream state via `~/dotfiles-backup-2026-05-17/omarchy-upstream.tar.zst`.
+
+## Naming convention: ours vs omarchy
+
+Clear separation between forked-from-omarchy and our own additions:
+
+- **`omarchy-<name>`** — came from upstream omarchy. May be modified in place for this fork, but provenance is upstream. Carries the `# omarchy:summary=...` header used by omarchy's script catalog.
+- **`<name>`** (no prefix) — written by us for this fork. Plain shebang + plain comment header. Do NOT add `# omarchy:summary=` — that header is reserved for upstream scripts.
+
+When creating a new helper script:
+
+1. Drop it in `dot_local/bin/executable_<descriptive-name>` — no `omarchy-` prefix.
+2. Use a plain header comment describing purpose; skip the `omarchy:summary=` line.
+3. If a kitty/hypr/waybar binding invokes it, reference the bare name (the script lands in `~/.local/bin/` which is on `$PATH`).
+
+Current personal scripts: `kitty-tab-picker`, `restart-bat`. Pattern is by negative space — omarchy prefix is the marker; absence of it means ours.
 
 ## Per-app flat migration: silent-include trap
 
