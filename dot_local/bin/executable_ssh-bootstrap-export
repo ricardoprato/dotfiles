@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# ssh-bootstrap-export — upload current ~/.ssh contents to Bitwarden via rbw.
+#
+# Counterpart of ssh-bootstrap. Scans:
+#   ~/.ssh/*             for files whose first line is a PEM/OPENSSH header
+#                        → uploaded as Secure Note 'ssh-key:<name>'
+#   ~/.ssh/config.d/*.conf
+#                        → uploaded as Secure Note 'ssh-config:<name>'
+#
+# Each item is stored with the item name on line 1 (password slot) and the
+# file body on lines 2..N (notes slot). ssh-bootstrap reads notes via
+# `rbw get --field notes` and reconstructs the original file verbatim.
+#
+# Idempotent: items already present in the vault are skipped. Prints a plan
+# and prompts before doing anything.
+set -euo pipefail
+
+SSH_DIR="$HOME/.ssh"
+CONF_DIR="$SSH_DIR/config.d"
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+
+die() { printf 'ssh-bootstrap-export: %s\n' "$*" >&2; exit 1; }
+
+command -v rbw >/dev/null || die "rbw not installed (pacman -S rbw)"
+[[ -d "$SSH_DIR" ]] || die "$SSH_DIR missing"
+
+# rbw add invokes $EDITOR to capture password+notes. If stdin is not a TTY,
+# rbw silently skips the editor and creates an empty item (exit 0, no warning).
+# Bail loudly so the user runs this interactively in a real terminal.
+[[ -t 0 ]] || die "must be run interactively in a terminal (stdin is not a TTY)"
+
+rbw unlock
+
+# Snapshot existing vault items once.
+existing=$(rbw list || true)
+has_item() { grep -Fxq "$1" <<<"$existing"; }
+
+is_privkey() {
+  local f=$1
+  [[ -f "$f" && -r "$f" ]] || return 1
+  local first
+  IFS= read -r first < "$f" || return 1
+  [[ "$first" =~ ^-----BEGIN[[:space:]].*PRIVATE[[:space:]]KEY----- ]]
+}
+
+# Build plan: arrays of "item|source-path" pairs.
+declare -a to_upload=() to_skip=()
+
+shopt -s nullglob
+for f in "$SSH_DIR"/*; do
+  [[ -f "$f" ]] || continue
+  case "${f##*/}" in
+    *.pub|known_hosts|known_hosts.old|config|authorized_keys) continue ;;
+  esac
+  is_privkey "$f" || continue
+  # Use full basename verbatim — preserves .pem/.txt/etc. for symmetric round-trip.
+  item="ssh-key:${f##*/}"
+  if has_item "$item"; then
+    to_skip+=("$item|$f")
+  else
+    to_upload+=("$item|$f")
+  fi
+done
+
+if [[ -d "$CONF_DIR" ]]; then
+  for f in "$CONF_DIR"/*.conf; do
+    name=${f##*/}; name=${name%.conf}
+    item="ssh-config:$name"
+    if has_item "$item"; then
+      to_skip+=("$item|$f")
+    else
+      to_upload+=("$item|$f")
+    fi
+  done
+fi
+shopt -u nullglob
+
+# Show plan.
+printf '\nPlan:\n'
+if [[ ${#to_upload[@]} -gt 0 ]]; then
+  printf '  upload:\n'
+  for entry in "${to_upload[@]}"; do
+    item=${entry%%|*}; src=${entry#*|}
+    printf '    %-40s  ← %s\n' "$item" "$src"
+  done
+fi
+if [[ ${#to_skip[@]} -gt 0 ]]; then
+  printf '  skip (already in vault):\n'
+  for entry in "${to_skip[@]}"; do
+    printf '    %s\n' "${entry%%|*}"
+  done
+fi
+printf '\n  totals: %d upload, %d skip\n\n' "${#to_upload[@]}" "${#to_skip[@]}"
+
+if [[ ${#to_upload[@]} -eq 0 ]]; then
+  printf 'Nothing to do.\n'
+  exit 0
+fi
+
+read -r -p 'Proceed? [y/N] ' confirm
+[[ "$confirm" =~ ^[Yy]$ ]] || { printf 'Aborted.\n'; exit 0; }
+
+# Stage payload + fake editor in tmpfs.
+payload=$(mktemp -p "$RUNTIME_DIR" rbw-payload.XXXXXX)
+editor=$(mktemp -p "$RUNTIME_DIR" rbw-editor.XXXXXX)
+chmod 600 "$payload"
+cat > "$editor" <<EOF
+#!/usr/bin/env bash
+cp "$payload" "\$1"
+EOF
+chmod 700 "$editor"
+trap 'shred -u "$payload" 2>/dev/null || rm -f "$payload"; rm -f "$editor"' EXIT
+
+uploaded=0
+failed=0
+
+# Verify a freshly uploaded item by re-reading its notes from the vault and
+# comparing against the source. Catches the silent-failure mode where rbw add
+# returns 0 but stored an empty/corrupt entry (e.g., no TTY for editor).
+# On mismatch, rolls back the broken item and aborts — preferable to leaving
+# half-corrupted state across the rest of the batch.
+verify_uploaded() {
+  local item=$1 src=$2
+  local notes expected_first actual_first
+
+  notes=$(rbw get "$item" --field notes 2>/dev/null)
+  if [[ -z "$notes" ]]; then
+    rbw remove "$item" 2>/dev/null
+    die "verify failed for '$item': stored notes are empty. Rolled back. Investigate before retrying."
+  fi
+
+  expected_first=$(head -n 1 "$src" | tr -d '\r')
+  actual_first=$(printf '%s' "$notes" | head -n 1 | tr -d '\r')
+  if [[ "$expected_first" != "$actual_first" ]]; then
+    rbw remove "$item" 2>/dev/null
+    die "verify failed for '$item': first line of stored notes does not match source. Rolled back."
+  fi
+}
+
+for entry in "${to_upload[@]}"; do
+  item=${entry%%|*}
+  src=${entry#*|}
+
+  # Payload: line 1 = item name (password slot); rest = file body (notes slot).
+  { printf '%s\n' "$item"; cat "$src"; } > "$payload"
+
+  if ! EDITOR="$editor" VISUAL="$editor" rbw add "$item" 2>/dev/null; then
+    printf 'FAILED    %s (rbw add returned non-zero)\n' "$item" >&2
+    failed=$((failed + 1))
+    continue
+  fi
+
+  verify_uploaded "$item" "$src"
+  printf 'uploaded  %s (verified)\n' "$item"
+  uploaded=$((uploaded + 1))
+done
+
+printf '\nDone: %d uploaded, %d failed, %d skipped\n' \
+  "$uploaded" "$failed" "${#to_skip[@]}"
+
+[[ $failed -eq 0 ]] || exit 1
