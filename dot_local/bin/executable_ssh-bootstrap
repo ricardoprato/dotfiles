@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# ssh-bootstrap — populate ~/.ssh from Bitwarden vault via rbw.
+#
+# Reads Secure Note items named:
+#   ssh-key:<name>     notes = private key contents     → ~/.ssh/<name> (0600)
+#                                                        + ~/.ssh/<name>.pub (derived, 0644)
+#   ssh-config:<name>  notes = ssh_config block         → ~/.ssh/config.d/<name>.conf (0600)
+#
+# Idempotent: skips destinations that already exist. To re-sync a single file,
+# delete it locally and re-run.
+#
+# Prerequisites: `rbw` installed and configured (`rbw login` done at least once);
+# `chezmoi apply` done so ~/.ssh and ~/.ssh/config.d exist with mode 0700.
+set -euo pipefail
+
+SSH_DIR="$HOME/.ssh"
+CONF_DIR="$SSH_DIR/config.d"
+
+die() { printf 'ssh-bootstrap: %s\n' "$*" >&2; exit 1; }
+
+command -v rbw >/dev/null || die "rbw not installed (pacman -S rbw)"
+[[ -d "$SSH_DIR"  ]] || die "$SSH_DIR missing — run 'chezmoi apply' first"
+[[ -d "$CONF_DIR" ]] || die "$CONF_DIR missing — run 'chezmoi apply' first"
+
+rbw unlock
+
+added=0
+skipped=0
+
+write_item() {
+  local item=$1 dest=$2 mode=$3
+  if [[ -e "$dest" || -L "$dest" ]]; then
+    printf 'skip   %s\n' "$dest"
+    skipped=$((skipped + 1))
+    return
+  fi
+  local tmp
+  tmp=$(mktemp "${dest}.XXXXXX")
+  chmod "$mode" "$tmp"
+  if ! rbw get "$item" --field notes > "$tmp"; then
+    rm -f "$tmp"
+    die "failed to read '$item' from vault"
+  fi
+  [[ -s "$tmp" ]] || { rm -f "$tmp"; die "'$item' has empty notes — populate it in Bitwarden"; }
+  mv "$tmp" "$dest"
+  printf 'write  %s\n' "$dest"
+  added=$((added + 1))
+}
+
+while IFS= read -r item; do
+  name=${item#ssh-key:}
+  dest="$SSH_DIR/$name"
+  write_item "$item" "$dest" 600
+  # Derive pubkey when we just wrote a new privkey and pub doesn't exist.
+  # Strip extension so foo.pem → foo.pub (SSH convention), foo → foo.pub (no-op).
+  pub="${dest%.*}.pub"
+  if [[ ! -e "$pub" && -e "$dest" ]]; then
+    if ssh-keygen -y -f "$dest" > "$pub" 2>/dev/null; then
+      chmod 644 "$pub"
+      printf 'write  %s\n' "$pub"
+    else
+      rm -f "$pub"
+    fi
+  fi
+done < <(rbw list | grep '^ssh-key:' || true)
+
+while IFS= read -r item; do
+  name=${item#ssh-config:}
+  write_item "$item" "$CONF_DIR/$name.conf" 600
+done < <(rbw list | grep '^ssh-config:' || true)
+
+printf '\nDone: %d added, %d skipped\n' "$added" "$skipped"
