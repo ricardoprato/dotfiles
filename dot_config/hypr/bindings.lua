@@ -2,26 +2,86 @@
 
 -- ===== media =====
 -- Volume, brightness, keyboard backlight, and touchpad controls.
-o.bind("XF86AudioRaiseVolume", "Volume up", "omarchy-swayosd-client --output-volume raise", { locked = true, repeating = true })
-o.bind("XF86AudioLowerVolume", "Volume down", "omarchy-swayosd-client --output-volume lower", { locked = true, repeating = true })
-o.bind("XF86AudioMute", "Mute", "omarchy-swayosd-client --output-volume mute-toggle", { locked = true, repeating = true })
+o.bind(
+	"XF86AudioRaiseVolume",
+	"Volume up",
+	"omarchy-swayosd-client --output-volume raise",
+	{ locked = true, repeating = true }
+)
+o.bind(
+	"XF86AudioLowerVolume",
+	"Volume down",
+	"omarchy-swayosd-client --output-volume lower",
+	{ locked = true, repeating = true }
+)
+o.bind(
+	"XF86AudioMute",
+	"Mute",
+	"omarchy-swayosd-client --output-volume mute-toggle",
+	{ locked = true, repeating = true }
+)
 o.bind("XF86AudioMicMute", "Mute microphone", "omarchy-audio-input-mute", { locked = true, repeating = true })
 o.bind("XF86MonBrightnessUp", "Brightness up", "omarchy-brightness-display +5%", { locked = true, repeating = true })
-o.bind("XF86MonBrightnessDown", "Brightness down", "omarchy-brightness-display 5%-", { locked = true, repeating = true })
-o.bind("SHIFT + XF86MonBrightnessUp", "Brightness maximum", "omarchy-brightness-display 100%", { locked = true, repeating = true })
-o.bind("SHIFT + XF86MonBrightnessDown", "Brightness minimum", "omarchy-brightness-display 1%", { locked = true, repeating = true })
-o.bind("XF86KbdBrightnessUp", "Keyboard brightness up", "omarchy-brightness-keyboard up", { locked = true, repeating = true })
-o.bind("XF86KbdBrightnessDown", "Keyboard brightness down", "omarchy-brightness-keyboard down", { locked = true, repeating = true })
+o.bind(
+	"XF86MonBrightnessDown",
+	"Brightness down",
+	"omarchy-brightness-display 5%-",
+	{ locked = true, repeating = true }
+)
+o.bind(
+	"SHIFT + XF86MonBrightnessUp",
+	"Brightness maximum",
+	"omarchy-brightness-display 100%",
+	{ locked = true, repeating = true }
+)
+o.bind(
+	"SHIFT + XF86MonBrightnessDown",
+	"Brightness minimum",
+	"omarchy-brightness-display 1%",
+	{ locked = true, repeating = true }
+)
+o.bind(
+	"XF86KbdBrightnessUp",
+	"Keyboard brightness up",
+	"omarchy-brightness-keyboard up",
+	{ locked = true, repeating = true }
+)
+o.bind(
+	"XF86KbdBrightnessDown",
+	"Keyboard brightness down",
+	"omarchy-brightness-keyboard down",
+	{ locked = true, repeating = true }
+)
 o.bind("XF86KbdLightOnOff", "Keyboard backlight cycle", "omarchy-brightness-keyboard cycle", { locked = true })
 o.bind("XF86TouchpadToggle", "Toggle touchpad", "omarchy-toggle-touchpad", { locked = true })
 o.bind("XF86TouchpadOn", "Enable touchpad", "omarchy-toggle-touchpad on", { locked = true })
 o.bind("XF86TouchpadOff", "Disable touchpad", "omarchy-toggle-touchpad off", { locked = true })
 
 -- Precise volume and brightness controls.
-o.bind("ALT + XF86AudioRaiseVolume", "Volume up precise", "omarchy-swayosd-client --output-volume +1", { locked = true, repeating = true })
-o.bind("ALT + XF86AudioLowerVolume", "Volume down precise", "omarchy-swayosd-client --output-volume -1", { locked = true, repeating = true })
-o.bind("ALT + XF86MonBrightnessUp", "Brightness up precise", "omarchy-brightness-display +1%", { locked = true, repeating = true })
-o.bind("ALT + XF86MonBrightnessDown", "Brightness down precise", "omarchy-brightness-display 1%-", { locked = true, repeating = true })
+o.bind(
+	"ALT + XF86AudioRaiseVolume",
+	"Volume up precise",
+	"omarchy-swayosd-client --output-volume +1",
+	{ locked = true, repeating = true }
+)
+o.bind(
+	"ALT + XF86AudioLowerVolume",
+	"Volume down precise",
+	"omarchy-swayosd-client --output-volume -1",
+	{ locked = true, repeating = true }
+)
+o.bind(
+	"ALT + XF86MonBrightnessUp",
+	"Brightness up precise",
+	"omarchy-brightness-display +1%",
+	{ locked = true, repeating = true }
+)
+o.bind(
+	"ALT + XF86MonBrightnessDown",
+	"Brightness down precise",
+	"omarchy-brightness-display 1%-",
+	{ locked = true, repeating = true }
+)
 
 -- Media controls.
 o.bind("XF86AudioNext", "Next track", "omarchy-swayosd-client --playerctl next", { locked = true })
@@ -35,13 +95,13 @@ o.bind("SUPER + XF86AudioMute", "Switch audio output", "omarchy-audio-output-swi
 -- Work around Hyprland send_shortcut sometimes leaving synthetic key state stuck/repeating.
 -- https://github.com/hyprwm/Hyprland/discussions/14099
 local function send_shortcut_once(mods, key)
-  return function()
-    hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "down", window = "activewindow" }))
+	return function()
+		hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "down", window = "activewindow" }))
 
-    hl.timer(function()
-      hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "up", window = "activewindow" }))
-    end, { timeout = 50, type = "oneshot" })
-  end
+		hl.timer(function()
+			hl.dispatch(hl.dsp.send_key_state({ mods = mods, key = key, state = "up", window = "activewindow" }))
+		end, { timeout = 50, type = "oneshot" })
+	end
 end
 
 o.bind("SUPER + C", "Universal copy", send_shortcut_once("CTRL", "Insert"))
@@ -68,14 +128,26 @@ o.bind("SUPER + UP", "Focus on above window", hl.dsp.focus({ direction = "u" }))
 o.bind("SUPER + DOWN", "Focus on below window", hl.dsp.focus({ direction = "d" }))
 
 for workspace = 1, 10 do
-  local key = "code:" .. tostring(workspace + 9)
-  o.bind("SUPER + " .. key, "Switch to workspace " .. workspace, hl.dsp.focus({ workspace = tostring(workspace) }))
-  o.bind("SUPER + SHIFT + " .. key, "Move window to workspace " .. workspace, hl.dsp.window.move({ workspace = tostring(workspace) }))
-  o.bind("SUPER + SHIFT + ALT + " .. key, "Move window silently to workspace " .. workspace, hl.dsp.window.move({ workspace = tostring(workspace), follow = false }))
+	local key = "code:" .. tostring(workspace + 9)
+	o.bind("SUPER + " .. key, "Switch to workspace " .. workspace, hl.dsp.focus({ workspace = tostring(workspace) }))
+	o.bind(
+		"SUPER + SHIFT + " .. key,
+		"Move window to workspace " .. workspace,
+		hl.dsp.window.move({ workspace = tostring(workspace) })
+	)
+	o.bind(
+		"SUPER + SHIFT + ALT + " .. key,
+		"Move window silently to workspace " .. workspace,
+		hl.dsp.window.move({ workspace = tostring(workspace), follow = false })
+	)
 end
 
 o.bind("SUPER + S", "Toggle scratchpad", hl.dsp.workspace.toggle_special("scratchpad"))
-o.bind("SUPER + ALT + S", "Move window to scratchpad", hl.dsp.window.move({ workspace = "special:scratchpad", follow = false }))
+o.bind(
+	"SUPER + ALT + S",
+	"Move window to scratchpad",
+	hl.dsp.window.move({ workspace = "special:scratchpad", follow = false })
+)
 
 o.bind("SUPER + TAB", "Next workspace", hl.dsp.focus({ workspace = "e+1" }))
 o.bind("SUPER + SHIFT + TAB", "Previous workspace", hl.dsp.focus({ workspace = "e-1" }))
@@ -104,15 +176,35 @@ o.bind("SUPER + code:21", "Shrink window left", hl.dsp.window.resize({ x = 100, 
 o.bind("SUPER + SHIFT + code:20", "Shrink window up", hl.dsp.window.resize({ x = 0, y = -100, relative = true }))
 o.bind("SUPER + SHIFT + code:21", "Expand window down", hl.dsp.window.resize({ x = 0, y = 100, relative = true }))
 
-o.bind("SUPER + ALT + code:20", "Expand window left a little", hl.dsp.window.resize({ x = -25, y = 0, relative = true }))
+o.bind(
+	"SUPER + ALT + code:20",
+	"Expand window left a little",
+	hl.dsp.window.resize({ x = -25, y = 0, relative = true })
+)
 o.bind("SUPER + ALT + code:21", "Shrink window left a little", hl.dsp.window.resize({ x = 25, y = 0, relative = true }))
-o.bind("SUPER + SHIFT + ALT + code:20", "Shrink window up a little", hl.dsp.window.resize({ x = 0, y = -25, relative = true }))
-o.bind("SUPER + SHIFT + ALT + code:21", "Expand window down a little", hl.dsp.window.resize({ x = 0, y = 25, relative = true }))
+o.bind(
+	"SUPER + SHIFT + ALT + code:20",
+	"Shrink window up a little",
+	hl.dsp.window.resize({ x = 0, y = -25, relative = true })
+)
+o.bind(
+	"SUPER + SHIFT + ALT + code:21",
+	"Expand window down a little",
+	hl.dsp.window.resize({ x = 0, y = 25, relative = true })
+)
 
 o.bind("SUPER + CTRL + code:20", "Expand window left a lot", hl.dsp.window.resize({ x = -300, y = 0, relative = true }))
 o.bind("SUPER + CTRL + code:21", "Shrink window left a lot", hl.dsp.window.resize({ x = 300, y = 0, relative = true }))
-o.bind("SUPER + CTRL + SHIFT + code:20", "Shrink window up a lot", hl.dsp.window.resize({ x = 0, y = -300, relative = true }))
-o.bind("SUPER + CTRL + SHIFT + code:21", "Expand window down a lot", hl.dsp.window.resize({ x = 0, y = 300, relative = true }))
+o.bind(
+	"SUPER + CTRL + SHIFT + code:20",
+	"Shrink window up a lot",
+	hl.dsp.window.resize({ x = 0, y = -300, relative = true })
+)
+o.bind(
+	"SUPER + CTRL + SHIFT + code:21",
+	"Expand window down a lot",
+	hl.dsp.window.resize({ x = 0, y = 300, relative = true })
+)
 
 o.bind("SUPER + mouse_down", "Scroll active workspace forward", hl.dsp.focus({ workspace = "e+1" }))
 o.bind("SUPER + mouse_up", "Scroll active workspace backward", hl.dsp.focus({ workspace = "e-1" }))
@@ -138,7 +230,11 @@ o.bind("SUPER + ALT + mouse_down", "Next window in group", hl.dsp.group.next())
 o.bind("SUPER + ALT + mouse_up", "Previous window in group", hl.dsp.group.prev())
 
 for index = 1, 5 do
-  o.bind("SUPER + ALT + code:" .. tostring(index + 9), "Switch to group window " .. index, hl.dsp.group.active({ index = index }))
+	o.bind(
+		"SUPER + ALT + code:" .. tostring(index + 9),
+		"Switch to group window " .. index,
+		hl.dsp.group.active({ index = index })
+	)
 end
 
 o.bind("SUPER + code:61", "Cycle monitor scaling", "omarchy-hyprland-monitor-scaling-cycle")
@@ -167,7 +263,11 @@ o.bind_menu("SUPER + CTRL + SPACE", "Background switcher", "background")
 o.bind_menu("SUPER + SHIFT + CTRL + SPACE", "Theme menu", "theme")
 o.bind("SUPER + BACKSPACE", "Toggle window transparency", "omarchy-hyprland-window-transparency-toggle")
 o.bind("SUPER + SHIFT + BACKSPACE", "Toggle window gaps", "omarchy-hyprland-window-gaps-toggle")
-o.bind("SUPER + CTRL + BACKSPACE", "Toggle single-window square aspect", "omarchy-hyprland-window-single-square-aspect-toggle")
+o.bind(
+	"SUPER + CTRL + BACKSPACE",
+	"Toggle single-window square aspect",
+	"omarchy-hyprland-window-single-square-aspect-toggle"
+)
 
 o.bind("SUPER + COMMA", "Dismiss last notification", "makoctl dismiss")
 o.bind("SUPER + SHIFT + COMMA", "Dismiss all notifications", "makoctl dismiss --all")
@@ -178,8 +278,17 @@ o.bind("SUPER + SHIFT + ALT + COMMA", "Restore last notification", "makoctl rest
 o.bind_toggle("SUPER + CTRL + I", "Toggle locking on idle", "idle")
 o.bind_toggle("SUPER + CTRL + N", "Toggle nightlight", "nightlight")
 o.bind("SUPER + CTRL + Delete", "Toggle laptop display", "omarchy-hyprland-monitor-internal toggle")
-o.bind("SUPER + CTRL + ALT + Delete", "Toggle laptop display mirroring", "omarchy-hyprland-monitor-internal-mirror toggle")
-o.bind("switch:on:Lid Switch", nil, "omarchy-hw-external-monitors && omarchy-hyprland-monitor-internal off", { locked = true })
+o.bind(
+	"SUPER + CTRL + ALT + Delete",
+	"Toggle laptop display mirroring",
+	"omarchy-hyprland-monitor-internal-mirror toggle"
+)
+o.bind(
+	"switch:on:Lid Switch",
+	nil,
+	"omarchy-hw-external-monitors && omarchy-hyprland-monitor-internal off",
+	{ locked = true }
+)
 o.bind("switch:off:Lid Switch", nil, "omarchy-hyprland-monitor-internal on", { locked = true })
 
 o.bind("PRINT", "Screenshot", "omarchy-capture-screenshot")
@@ -209,12 +318,12 @@ o.bind("SUPER + CTRL + X", "Toggle dictation", "voxtype record toggle")
 -- o.bind("F9", "Stop dictation (push-to-talk)", "voxtype record stop", { release = true })
 
 o.bind("SUPER + CTRL + Z", "Zoom in", function()
-  local zoom = hl.get_config("cursor.zoom_factor") or 1
-  hl.config({ cursor = { zoom_factor = zoom + 1 } })
+	local zoom = hl.get_config("cursor.zoom_factor") or 1
+	hl.config({ cursor = { zoom_factor = zoom + 1 } })
 end)
 
 o.bind("SUPER + CTRL + ALT + Z", "Reset zoom", function()
-  hl.config({ cursor = { zoom_factor = 1 } })
+	hl.config({ cursor = { zoom_factor = 1 } })
 end)
 
 o.bind("SUPER + CTRL + L", "Lock system", "omarchy-system-lock")
@@ -233,27 +342,28 @@ o.bind("SUPER + SHIFT + M", "Music", { omarchy = "or-focus spotify" })
 o.bind("SUPER + SHIFT + ALT + M", "Music TUI", { tui = "cliamp", focus = true })
 o.bind("SUPER + SHIFT + N", "Editor", { omarchy = "editor" })
 o.bind("SUPER + SHIFT + D", "Docker", { tui = "lazydocker" })
-o.bind("SUPER + SHIFT + G", "Signal", { launch = "signal-desktop", focus = "^signal$" })
+o.bind("SUPER + SHIFT + G", "Telegram", { launch = "Telegram", focus = "^org\\.telegram\\.desktop$" })
 o.bind("SUPER + SHIFT + O", "Obsidian", { launch = "obsidian", focus = "^obsidian$" })
-o.bind("SUPER + SHIFT + SLASH", "Passwords", { launch = "1password" })
+o.bind("SUPER + SHIFT + V", "Passwords", { launch = "bitwarden-desktop", focus = "^Bitwarden$" })
 
 -- Web app bindings.
 o.bind("SUPER + SHIFT + C", "Google Calendar", { webapp = "https://calendar.google.com/", focus = true })
 o.bind("SUPER + SHIFT + E", "Google Keep", { webapp = "https://keep.google.com/", focus = true })
 o.bind("SUPER + SHIFT + Y", "YouTube", { webapp = "https://youtube.com/" })
 o.bind("SUPER + SHIFT + ALT + G", "WhatsApp", { webapp = "https://web.whatsapp.com/", focus = true })
-o.bind("SUPER + SHIFT + CTRL + G", "Google Messages", { webapp = "https://messages.google.com/web/conversations", focus = true })
+o.bind(
+	"SUPER + SHIFT + CTRL + G",
+	"Google Messages",
+	{ webapp = "https://messages.google.com/web/conversations", focus = true }
+)
 o.bind("SUPER + SHIFT + P", "Google Photos", { webapp = "https://photos.google.com/", focus = true })
-o.bind("SUPER + SHIFT + S", "Google Maps", { webapp = "https://maps.google.com/", focus = true })
+o.bind("SUPER + SHIFT + W", "Google Maps", { webapp = "https://maps.google.com/", focus = true })
+o.bind("SUPER + SHIFT + U", "Busuu", { webapp = "https://www.busuu.com/", focus = true })
 
 -- Add extra bindings below.
--- o.bind("SUPER + SHIFT + R", "SSH", "alacritty -e ssh your-server")
-
--- Overwrite existing bindings with hl.unbind() first if needed.
--- hl.unbind("SUPER + SPACE")
--- o.bind("SUPER + SPACE", "Omarchy menu", "omarchy-menu")
+o.bind("SUPER + SHIFT + R", "SSH host picker", { tui = "sshs", focus = true })
 
 -- Logitech MX Keys examples:
--- o.bind("SUPER + SHIFT + S", nil, "omarchy-capture-screenshot")
--- o.bind("SUPER + H", nil, "voxtype record toggle")
--- o.bind("SUPER + PERIOD", nil, { omarchy = "walker -m symbols" })
+o.bind("SUPER + SHIFT + S", nil, "omarchy-capture-screenshot")
+o.bind("SUPER + H", nil, "voxtype record toggle")
+o.bind("SUPER + PERIOD", nil, { omarchy = "walker -m symbols" })
