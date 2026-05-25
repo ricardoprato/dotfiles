@@ -1,0 +1,4 @@
+[[manager.prepend_keymap]]
+on = ["c", "k"]
+run = 'shell -- yazi-kdeconnect-share "$@"'
+desc = "Send selected to phone via KDE Connect"
