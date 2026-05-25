@@ -24,7 +24,7 @@
   ;; Si los mods se disparan al tipear rápido, subí hold-time a 220-250.
   ;; Si sentís lag al usar mods, bajá tap-time.
   tap-time  150
-  hold-time 200
+  hold-time 230
 )
 
 (defalias
