@@ -348,7 +348,7 @@ o.bind("SUPER + SHIFT + V", "Passwords", { launch = "bitwarden-desktop", focus =
 
 -- Web app bindings.
 o.bind("SUPER + SHIFT + C", "Google Calendar", { webapp = "https://calendar.google.com/", focus = true })
-o.bind("SUPER + SHIFT + E", "Google Keep", { webapp = "https://keep.google.com/", focus = true })
+o.bind("SUPER + SHIFT + E", "Notion", { webapp = "https://www.notion.so/", focus = true })
 o.bind("SUPER + SHIFT + Y", "YouTube", { webapp = "https://youtube.com/" })
 o.bind("SUPER + SHIFT + ALT + G", "WhatsApp", { webapp = "https://web.whatsapp.com/", focus = true })
 o.bind(
