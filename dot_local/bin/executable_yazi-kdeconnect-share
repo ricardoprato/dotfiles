@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Send file(s) to a KDE Connect device. Designed for yazi but works from anywhere.
+# Auto-picks the only reachable device; falls back to walker --dmenu for >1.
+
+set -euo pipefail
+
+notify() { notify-send -i "$1" "KDE Connect" "$2"; }
+
+if [ $# -eq 0 ]; then
+    notify kdeconnect "No files passed"
+    exit 1
+fi
+
+declare -A devices
+while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    id="${line%% *}"
+    name="${line#* }"
+    name="${name# - }"
+    devices["$id"]="$name"
+done < <(kdeconnect-cli -a --id-name-only)
+
+case ${#devices[@]} in
+    0)
+        notify kdeconnect-tray-error "No reachable devices"
+        exit 1
+        ;;
+    1)
+        device_id="${!devices[*]}"
+        ;;
+    *)
+        choices=""
+        for id in "${!devices[@]}"; do
+            choices+="${devices[$id]}	${id}"$'\n'
+        done
+        chosen=$(printf '%s' "$choices" | walker --dmenu) || exit 1
+        device_id="${chosen##*	}"
+        ;;
+esac
+
+device_name="${devices[$device_id]}"
+
+failed=0
+for f in "$@"; do
+    kdeconnect-cli --share "$f" -d "$device_id" >/dev/null 2>&1 || ((failed++))
+done
+
+count=$#
+ok=$((count - failed))
+
+if [ "$failed" -eq 0 ]; then
+    notify kdeconnect "Sent ${ok} file(s) to ${device_name}"
+else
+    notify kdeconnect-tray-error "Sent ${ok}/${count} to ${device_name} (${failed} failed)"
+    exit 1
+fi
