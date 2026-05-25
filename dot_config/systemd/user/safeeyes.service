@@ -1,0 +1,16 @@
+[Unit]
+Description=Safe Eyes - eye strain & RSI break reminder
+PartOf=graphical-session.target
+After=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/safeeyes
+ExecStartPost=%h/.local/bin/safeeyes-apply-schedule
+Slice=session.slice
+Restart=on-failure
+TimeoutStopSec=5
+
+[Install]
+WantedBy=graphical-session.target

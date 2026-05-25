@@ -1,0 +1,10 @@
+[Unit]
+Description=Disable safeeyes breaks at work-day end
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 18:00:00
+Persistent=true
+Unit=safeeyes-apply-schedule.service
+
+[Install]
+WantedBy=timers.target

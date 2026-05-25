@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# safeeyes-apply-schedule — toggle safeeyes break engine based on work hours.
+# Invoked by safeeyes-apply-schedule.service (start/end timers) and by
+# safeeyes.service ExecStartPost as a login catch-up.
+# Schedule lives here — edit the four constants below to change the window.
+
+set -euo pipefail
+
+WORK_DOW_MIN=1
+WORK_DOW_MAX=5
+WORK_HOUR_START=9
+WORK_HOUR_END=18
+
+if ! pgrep -u "$USER" -x safeeyes >/dev/null 2>&1; then
+    echo "safeeyes daemon not running; nothing to schedule"
+    exit 0
+fi
+
+for _ in 1 2 3 4 5; do
+    if safeeyes --status >/dev/null 2>&1; then break; fi
+    sleep 1
+done
+
+dow=$(date +%u)
+hour=$((10#$(date +%H)))
+
+if [ "$dow" -ge "$WORK_DOW_MIN" ] && [ "$dow" -le "$WORK_DOW_MAX" ] \
+   && [ "$hour" -ge "$WORK_HOUR_START" ] && [ "$hour" -lt "$WORK_HOUR_END" ]; then
+    echo "within work hours (dow=$dow hour=$hour) → enabling breaks"
+    safeeyes --enable
+else
+    echo "outside work hours (dow=$dow hour=$hour) → disabling breaks"
+    safeeyes --disable
+fi
