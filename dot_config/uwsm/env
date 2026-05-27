@@ -12,6 +12,12 @@ export DOTFILES_STATE_PATH=$HOME/.local/state/dotfiles
 # tesseract-data-<lang> installed per language.
 export OMARCHY_OCR_LANGS=eng+spa
 
+# Pin the weather widget location. wttr.in's IP geolocation is unreliable and
+# intermittently misresolves this connection (Telecom Argentina) to the US,
+# serving the wrong hemisphere's temperature. See chubin/wttr.in#599. City name
+# or "lat,lon"; consumed by omarchy-weather-{status,icon}. Unset = auto geo-IP.
+export OMARCHY_WEATHER_LOCATION=Buenos+Aires
+
 # Set default terminal and editor
 source ~/.config/uwsm/default
 
