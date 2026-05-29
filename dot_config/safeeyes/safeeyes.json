@@ -46,7 +46,7 @@
       "version": "0.0.1"
     },
     {
-      "enabled": true,
+      "enabled": false,
       "id": "audiblealert",
       "settings": {
         "post_break_alert": true,
