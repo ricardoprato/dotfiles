@@ -18,6 +18,15 @@ export OMARCHY_OCR_LANGS=eng+spa
 # or "lat,lon"; consumed by omarchy-weather-{status,icon}. Unset = auto geo-IP.
 export OMARCHY_WEATHER_LOCATION=Buenos+Aires
 
+# Input method (fcitx5 + mozc for Japanese; passthrough for normal latam typing).
+# GTK_IM_MODULE intentionally omitted: GTK4 uses native Wayland IME protocol;
+# setting it forces the legacy path and breaks GTK4 apps.
+# Electron/Chromium: see *-flags.conf (--enable-wayland-ime).
+export XMODIFIERS=@im=fcitx
+export QT_IM_MODULE=fcitx
+export SDL_IM_MODULE=fcitx
+export GLFW_IM_MODULE=ibus
+
 # Set default terminal and editor
 source ~/.config/uwsm/default
 
