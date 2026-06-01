@@ -6,10 +6,14 @@ if systemctl --user is-enabled elephant.service &>/dev/null; then
   systemctl --user restart elephant.service
 fi
 
-# Walker in this fork has no systemd unit — runs via D-Bus activation
-# from ~/.config/walker/default/walker.desktop. Kill the daemon so the
-# next request picks up fresh config/CSS instead of reusing the cached
-# theme tokens from the previous theme.
-pkill -x walker 2>/dev/null
-sleep 0.2
-setsid -f walker --gapplication-service </dev/null >/dev/null 2>&1
+# Walker runs as a systemd user unit (walker.service). Restarting the unit
+# kills the daemon — invalidating the cached theme tokens — and brings it
+# straight back up, so the next request renders with fresh config/CSS.
+if systemctl --user is-enabled walker.service &>/dev/null; then
+  systemctl --user restart walker.service
+else
+  # Fallback for environments where the unit isn't installed yet.
+  pkill -x walker 2>/dev/null
+  sleep 0.2
+  setsid -f walker --gapplication-service </dev/null >/dev/null 2>&1
+fi
