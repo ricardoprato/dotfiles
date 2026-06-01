@@ -224,8 +224,9 @@ grep -rn "share/omarchy/default/\|omarchy/current/\|share/omarchy/themes\|share/
 
 ## Service quirks
 
-- **Walker has no systemd unit in this fork.** Walker runs via D-Bus activation from `dot_config/walker/default/walker.desktop`. `omarchy-restart-walker` has been rewritten to `pkill -x walker && setsid -f walker --gapplication-service` for this fork.
-- **Walker caches CSS theme tokens in the running daemon** — kill+relaunch is required after theme changes; a `makoctl reload` style soft reload does not exist. `omarchy-theme-set` calls `omarchy-restart-walker` after each theme switch.
+- **Walker runs as a systemd user unit** (`dot_config/systemd/user/walker.service`, enabled via the `graphical-session.target.wants/symlink_walker.service.tmpl` symlink). It starts at login as `walker --gapplication-service` and has `Restart=on-failure`. This keeps the daemon warm (no cold-start lag on the first menu invocation) and eliminates the race in `omarchy-launch-walker` where it spawned the daemon and `exec`'d into it before D-Bus was ready. The `walker.desktop` D-Bus activation entry still exists as a fallback. `elephant` (walker's backend) is not unitized — `omarchy-launch-walker` still starts it lazily.
+- **omarchy-restart-walker** restarts the unit (`systemctl --user restart walker.service`), with a `pkill + setsid` fallback for machines where the unit isn't installed yet.
+- **Walker caches CSS theme tokens in the running daemon** — restart is required after theme changes; a `makoctl reload` style soft reload does not exist. Restarting the unit kills+relaunches the daemon, which invalidates the cache. `omarchy-theme-set` calls `omarchy-restart-walker` after each theme switch.
 - **omarchy-toggle state** lives at `~/.local/state/omarchy/toggles/` (NOT under `dotfiles/`). It's omarchy-feature state, not theming state, so it stays in the omarchy namespace. Empty stubs (`empty_mako.ini`, `empty_walker.css`) tracked in chezmoi prevent silent-include failures.
 
 ## Constraints
