@@ -1,6 +1,0 @@
-[Unit]
-Description=Apply safeeyes work-hours schedule
-
-[Service]
-Type=oneshot
-ExecStart=%h/.local/bin/safeeyes-apply-schedule
