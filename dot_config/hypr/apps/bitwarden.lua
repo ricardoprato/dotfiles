@@ -1,6 +1,6 @@
 o.window("^(Bitwarden)$", { no_screen_share = true, tag = "+floating-window" })
 
-o.window("chrome-nngceckbapebfimnlniiiahkandclblb-Default", {
+o.window("(chrome|brave)-nngceckbapebfimnlniiiahkandclblb-Default", {
   no_screen_share = true,
   tag = "+floating-window",
 })
