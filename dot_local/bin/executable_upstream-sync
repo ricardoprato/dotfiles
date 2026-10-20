@@ -1,0 +1,719 @@
+#!/bin/bash
+#
+# upstream-sync: move the pinned upstream omarchy (.chezmoidata/omarchy.toml)
+# to a new commit and tell what that means for this overlay. Reports first
+# (new/removed bins, binding changes, themes, templates, shell plugins, userland
+# migrations, and drift in every override recorded in the pin file), then bumps
+# the pin, applies the external, runs checks and commits the pin + the report.
+# Any failing check restores the old pin and re-applies it.
+#
+# Usage:
+#   upstream-sync [--dry-run] [<ref>]    ref = sha, tag or branch; default is
+#                                        upstream's default branch HEAD. The
+#                                        full resolved sha is what gets pinned.
+#   upstream-sync --accept-override <path>
+#                                        after porting an upstream change into
+#                                        an override, record the applied
+#                                        upstream hash for it (<path> is the key
+#                                        in the pin file, e.g. bin/omarchy-x, or
+#                                        a bare bin name).
+#
+# --dry-run only reads (network + a history cache clone); nothing in the repo,
+# in $HOME or in the session changes. Test knobs (env): UPSTREAM_SYNC_URL,
+# UPSTREAM_SYNC_CACHE, UPSTREAM_SYNC_FILTER, UPSTREAM_SYNC_SOURCE,
+# UPSTREAM_SYNC_SKIP_SESSION=1 (skip Hyprland and shell checks).
+
+# Markdown backticks inside printf/sed strings are literal on purpose.
+# shellcheck disable=SC2016
+
+PIN_REL=.chezmoidata/omarchy.toml
+EXT_REL=.chezmoiexternal.toml.tmpl
+REPORT_DIR_REL=odd/upstream-sync
+
+URL=${UPSTREAM_SYNC_URL:-https://github.com/basecamp/omarchy.git}
+CACHE=${UPSTREAM_SYNC_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/upstream-sync/omarchy}
+FILTER=${UPSTREAM_SYNC_FILTER-blob:none}
+
+DRY_RUN=0
+SRC=""
+T=""
+OLD=""
+NEW=""
+PATHSPEC=()
+CHECKS=()
+LANDING=""
+
+log() { printf '==> %s\n' "$*" >&2; }
+warn() { printf 'warning: %s\n' "$*" >&2; }
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  cat <<'EOF'
+Usage: upstream-sync [--dry-run] [<ref>]
+       upstream-sync --accept-override <path>
+
+  <ref>               sha, tag or branch of basecamp/omarchy (default: HEAD)
+  --dry-run           report only; change nothing
+  --accept-override   record the applied upstream hash for an override after
+                      porting its upstream change by hand
+EOF
+}
+
+# ---------------------------------------------------------------- pin file ---
+
+pin_commit() {
+  awk -F'"' '/^\[omarchy\]/ { s = 1; next } /^\[/ { s = 0 }
+    s && /^commit[[:space:]]*=/ { print $2; exit }' "$1"
+}
+
+pin_landing() {
+  awk -F'"' '/^\[omarchy\]/ { s = 1; next } /^\[/ { s = 0 }
+    s && /^landing[[:space:]]*=/ { print $2; exit }' "$1"
+}
+
+# <file> <sha>: rewrite [omarchy].commit in place.
+pin_set_commit() {
+  local file=$1 sha=$2 tmp
+  tmp=$(mktemp)
+  awk -v sha="$sha" '/^\[omarchy\]/ { s = 1; print; next } /^\[/ { s = 0 }
+    s && !done && /^commit[[:space:]]*=/ { print "commit = \"" sha "\""; done = 1; next }
+    { print }' "$file" >"$tmp"
+  cat "$tmp" >"$file"
+  rm -f "$tmp"
+  [[ $(pin_commit "$file") == "$sha" ]] || die "could not rewrite the commit in $file"
+}
+
+# <file>: "<upstream path>\t<recorded sha256>" per override.
+pin_overrides() {
+  awk 'match($0, /^\[omarchy\.overrides\."[^"]+"\]/) {
+         p = substr($0, RSTART + 20, RLENGTH - 22); next }
+       /^\[/ { p = "" }
+       p != "" && /^sha256[[:space:]]*=/ { split($0, a, "\""); print p "\t" a[2] }' "$1"
+}
+
+# <file> <path> <sha256>: rewrite the override's sha256 in place.
+pin_set_override_sha() {
+  local file=$1 path=$2 sha=$3 tmp
+  tmp=$(mktemp)
+  awk -v hdr="[omarchy.overrides.\"$path\"]" -v sha="$sha" '
+    $0 == hdr { s = 1; print; next } /^\[/ { s = 0 }
+    s && !done && /^sha256[[:space:]]*=/ { print "sha256 = \"" sha "\""; done = 1; next }
+    { print }' "$file" >"$tmp"
+  cat "$tmp" >"$file"
+  rm -f "$tmp"
+}
+
+# --------------------------------------------------- external include/exclude
+
+# <template> <key>: the quoted strings of a `key = [ ... ]` TOML array.
+ext_array() {
+  awk -v k="$2" '
+    $0 ~ "^[[:space:]]*" k "[[:space:]]*=[[:space:]]*\\[" { on = 1 }
+    on {
+      line = $0
+      while (match(line, /"[^"]*"/)) {
+        print substr(line, RSTART + 1, RLENGTH - 2)
+        line = substr(line, RSTART + RLENGTH)
+      }
+      if ($0 ~ /\]/) on = 0
+    }' "$1"
+}
+
+# <template>: fill PATHSPEC with the git pathspecs equivalent to the external's
+# include/exclude (chezmoi patterns carry a leading "*/" wildcard for the
+# archive's top directory; it is dropped, the rest is relative to the root).
+build_pathspec() {
+  local tpl=$1 p inc=()
+  PATHSPEC=()
+  while IFS= read -r p; do
+    [[ -n $p ]] || continue
+    p=${p#\*/}
+    inc+=(":(glob)$p" ":(glob)$p/**")
+  done < <(ext_array "$tpl" include)
+  if ((${#inc[@]})); then PATHSPEC=("${inc[@]}"); else PATHSPEC=(.); fi
+  while IFS= read -r p; do
+    [[ -n $p ]] || continue
+    p=${p#\*/}
+    PATHSPEC+=(":(exclude,glob)$p" ":(exclude,glob)$p/**")
+  done < <(ext_array "$tpl" exclude)
+}
+
+# --------------------------------------------------------------- upstream git
+
+G() { git --git-dir="$CACHE" "$@"; }
+
+ensure_cache() {
+  local args=()
+  [[ -n $FILTER ]] && args=("--filter=$FILTER")
+  if [[ ! -d $CACHE ]]; then
+    log "cloning upstream history into $CACHE (first run)"
+    mkdir -p "$(dirname "$CACHE")"
+    git clone --bare --no-tags "${args[@]}" "$URL" "$CACHE" >&2 ||
+      die "cache clone failed (network? $URL)"
+  fi
+  G fetch --quiet --no-tags "${args[@]}" origin \
+    '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*' ||
+    die "fetching upstream into the cache failed (network?)"
+}
+
+have_commit() { [[ -n ${1:-} ]] && G cat-file -e "$1^{commit}" 2>/dev/null; }
+
+fetch_commit() {
+  local args=()
+  [[ -n $FILTER ]] && args=("--filter=$FILTER")
+  G fetch --quiet --no-tags "${args[@]}" origin "$1" 2>/dev/null || true
+}
+
+# [<ref>]: print the full sha; empty ref = upstream default branch HEAD.
+resolve_ref() {
+  local ref=${1:-} sha=""
+  if [[ -z $ref ]]; then
+    sha=$(git ls-remote "$URL" HEAD | awk 'NR == 1 { print $1 }') || true
+    [[ $sha =~ ^[0-9a-f]{40}$ ]] || die "cannot resolve upstream HEAD from $URL"
+  else
+    sha=$(G rev-parse --verify --quiet "${ref}^{commit}" 2>/dev/null) || sha=""
+    if [[ -z $sha && $ref =~ ^[0-9a-f]{40}$ ]]; then sha=$ref; fi
+  fi
+  have_commit "$sha" || fetch_commit "$sha"
+  have_commit "$sha" || die "ref '${ref:-HEAD}' does not resolve to a commit in upstream"
+  printf '%s\n' "$sha"
+}
+
+short() { printf '%s' "${1:0:8}"; }
+
+# <sha> <path>: sha256 of the file at that commit; empty when absent.
+blob_sha256() {
+  G cat-file -e "$1:$2" 2>/dev/null || return 0
+  G cat-file blob "$1:$2" | sha256sum | awk '{ print $1 }'
+}
+
+bin_summary() {
+  G cat-file blob "$1:$2" 2>/dev/null |
+    awk -F'omarchy:summary=' '/omarchy:summary=/ && !s { s = $2 } END { print s }'
+}
+
+# ------------------------------------------------------------- report builders
+# Each section writes $T/<name>.md and sets C_<name> counters for the summary.
+
+sec_header() {
+  local count first last d_old d_new
+  d_old=$(G log -1 --format=%cs "$OLD")
+  d_new=$(G log -1 --format=%cs "$NEW")
+  if G merge-base --is-ancestor "$OLD" "$NEW"; then
+    count=$(G rev-list --count "$OLD..$NEW")
+    G log --format=%cs "$OLD..$NEW" >"$T/dates"
+    first=$(tail -n 1 "$T/dates")
+    last=$(sed -n 1p "$T/dates")
+    C_COMMITS="$count commits, ${first:-$d_old} .. ${last:-$d_new}"
+  else
+    count=$(G rev-list --count "$NEW..$OLD")
+    C_COMMITS="NOT A DESCENDANT of the pin (downgrade or divergence; $OLD is $count commits ahead of the merge), $d_new vs $d_old"
+  fi
+}
+
+sec_bins() {
+  local st path out=$T/bins.md
+  C_BIN_A=0 C_BIN_D=0 C_BIN_M=0
+  : >"$out"
+  while IFS=$'\t' read -r st path; do
+    [[ $path == bin/* ]] || continue
+    case $st in
+      A)
+        C_BIN_A=$((C_BIN_A + 1))
+        printf -- '- added `%s`: %s\n' "${path#bin/}" "$(bin_summary "$NEW" "$path")" >>"$out"
+        ;;
+      D)
+        C_BIN_D=$((C_BIN_D + 1))
+        printf -- '- removed `%s`: %s\n' "${path#bin/}" "$(bin_summary "$OLD" "$path")" >>"$out"
+        ;;
+      *) C_BIN_M=$((C_BIN_M + 1)) ;;
+    esac
+  done <"$T/ns"
+  [[ -s $out ]] || echo "- no bins added or removed" >"$out"
+  echo "- $C_BIN_M bins changed" >>"$out"
+}
+
+sec_bindings() {
+  local out=$T/bindings.md
+  G diff -U0 --no-renames "$OLD" "$NEW" -- default/hypr/bindings | awk '
+    /^--- / { if ($2 != "/dev/null") f = substr($2, 3); next }
+    /^\+\+\+ / { if ($2 != "/dev/null") f = substr($2, 3); next }
+    /^[+-][[:space:]]*o\.(re)?bind/ {
+      if (f != last) { print "# " f; last = f }
+      print
+    }' >"$T/bindings.raw"
+  C_BIND_A=$(grep -c '^+' "$T/bindings.raw" || true)
+  C_BIND_D=$(grep -c '^-' "$T/bindings.raw" || true)
+  if [[ -s $T/bindings.raw ]]; then
+    { echo '```diff'; cat "$T/bindings.raw"; echo '```'; } >"$out"
+  else
+    echo "- no o.bind/o.rebind changes" >"$out"
+  fi
+}
+
+theme_names() { G ls-tree -d --name-only "$1" themes/ 2>/dev/null | sed 's|^themes/||' | sort; }
+
+sec_themes() {
+  local out=$T/themes.md added removed changed
+  theme_names "$OLD" >"$T/themes.old"
+  theme_names "$NEW" >"$T/themes.new"
+  added=$(comm -13 "$T/themes.old" "$T/themes.new")
+  removed=$(comm -23 "$T/themes.old" "$T/themes.new")
+  changed=$(awk -F'\t' '$2 ~ /^themes\/[^\/]+\// { split($2, a, "/"); print a[2] }' "$T/ns" | sort -u |
+    comm -12 - "$T/themes.old" | comm -12 - "$T/themes.new" || true)
+  C_THEME_A=$(printf '%s' "$added" | grep -c . || true)
+  C_THEME_D=$(printf '%s' "$removed" | grep -c . || true)
+  C_THEME_M=$(printf '%s' "$changed" | grep -c . || true)
+  {
+    [[ -n $added ]] && sed 's/^/- added `/; s/$/`/' <<<"$added"
+    [[ -n $removed ]] && sed 's/^/- removed `/; s/$/`/' <<<"$removed"
+    echo "- $C_THEME_M existing themes changed"
+  } >"$out"
+}
+
+sec_templates() {
+  local out=$T/templates.md st path
+  C_TPL_A=0 C_TPL_D=0 C_TPL_M=0
+  : >"$out"
+  while IFS=$'\t' read -r st path; do
+    [[ $path == */themed/* ]] || continue
+    case $st in
+      A) C_TPL_A=$((C_TPL_A + 1)); echo "- added \`$path\`" >>"$out" ;;
+      D) C_TPL_D=$((C_TPL_D + 1)); echo "- removed \`$path\`" >>"$out" ;;
+      *) C_TPL_M=$((C_TPL_M + 1)); echo "- changed \`$path\`" >>"$out" ;;
+    esac
+  done <"$T/ns"
+  [[ -s $out ]] || echo "- no themed template changes" >"$out"
+}
+
+sec_shell() {
+  local out=$T/shell.md
+  awk -F'\t' '$2 ~ /^shell\/plugins\/[^\/]+\// { split($2, a, "/"); n[a[3]]++ }
+    END { for (p in n) printf "%s\t%d\n", p, n[p] }' "$T/ns" | sort >"$T/shell.counts"
+  C_SHELL_PLUGINS=$(grep -c . "$T/shell.counts" || true)
+  C_SHELL_FILES=$(awk -F'\t' '$2 ~ /^shell\// { n++ } END { print n + 0 }' "$T/ns")
+  if [[ -s $T/shell.counts ]]; then
+    awk -F'\t' '{ printf "- `%s`: %d files\n", $1, $2 }' "$T/shell.counts" >"$out"
+  else
+    echo "- no shell plugin changes" >"$out"
+  fi
+  echo "- $C_SHELL_FILES files changed under shell/ (restart needed when > 0)" >>"$out"
+}
+
+sec_migrations() {
+  local out=$T/migrations.md
+  G diff -U0 --no-renames --diff-filter=A "$OLD" "$NEW" -- migrations | awk '
+    function flush() {
+      if (file == "") return
+      t = first != "" ? first : fb
+      printf "%s\t%s\t%s\n", file, flag, t
+    }
+    /^diff --git / { flush(); file = $4; sub(/^b\//, "", file); first = ""; fb = ""; flag = ""; next }
+    /^(---|\+\+\+) / { next }
+    /^\+/ {
+      l = substr($0, 2)
+      if (first == "" && l ~ /^#/ && l !~ /^#!/) { first = l; sub(/^#+[[:space:]]*/, "", first) }
+      if (fb == "" && l !~ /^[[:space:]]*$/ && l !~ /^#!/ && l !~ /^[[:space:]]*#/) fb = l
+      low = tolower(l)
+      if (low ~ /\.config\/hypr/ && flag !~ /hypr/) flag = flag " hypr"
+      if (low ~ /\.config\/omarchy/ && flag !~ /omarchy-config/) flag = flag " omarchy-config"
+      if (low ~ /\.local\/bin/ && flag !~ /local-bin/) flag = flag " local-bin"
+      if (low ~ /theme/ && flag !~ /theme/) flag = flag " theme"
+    }
+    END { flush() }' >"$T/migrations.raw"
+  C_MIG=$(grep -c . "$T/migrations.raw" || true)
+  C_MIG_FLAG=$(awk -F'\t' '$2 != "" { n++ } END { print n + 0 }' "$T/migrations.raw")
+  if [[ -s $T/migrations.raw ]]; then
+    awk -F'\t' '{ f = ($2 != "") ? "  **[touches overlay-owned:" $2 "]**" : ""
+      printf "- `%s`: %s%s\n", $1, $3, f }' "$T/migrations.raw" >"$out"
+  else
+    echo "- no migrations added" >"$out"
+  fi
+}
+
+sec_overrides() {
+  local out=$T/overrides.md path rec now old_now
+  C_OV=0 C_OV_CHANGED=0 C_OV_REMOVED=0
+  : >"$out"
+  while IFS=$'\t' read -r path rec; do
+    C_OV=$((C_OV + 1))
+    now=$(blob_sha256 "$NEW" "$path")
+    if [[ -z $now ]]; then
+      C_OV_REMOVED=$((C_OV_REMOVED + 1))
+      printf '### REMOVED upstream: `%s`\nThe override has no upstream counterpart any more; decide whether to keep or drop it.\n\n' "$path" >>"$out"
+      continue
+    fi
+    [[ $now == "$rec" ]] && continue
+    C_OV_CHANGED=$((C_OV_CHANGED + 1))
+    old_now=$(blob_sha256 "$OLD" "$path")
+    {
+      printf '### CHANGED upstream: `%s`\n' "$path"
+      printf -- '- recorded base sha256: `%s`\n- new upstream sha256: `%s`\n' "$rec" "$now"
+      if [[ -z $old_now ]]; then
+        echo "- the file did not exist at the old pin; no diff to show"
+      else
+        [[ $old_now == "$rec" ]] ||
+          echo "- note: the recorded hash does not match the file at the old pin either; the diff below may not be what the override forked from"
+        echo '```'
+        G diff --stat --no-color "$OLD" "$NEW" -- "$path" | cat
+        echo '```'
+        echo '```diff'
+        G diff --no-color -U2 "$OLD" "$NEW" -- "$path" | sed -n '1,80p'
+        echo '```'
+      fi
+      printf 'After porting the change into the override: `upstream-sync --accept-override %s`\n\n' "$path"
+    } >>"$out"
+  done < <(pin_overrides "$SRC/$PIN_REL")
+  [[ -s $out ]] || echo "- all $C_OV overrides still match upstream" >"$out"
+}
+
+# Builds the report body on stdout (summary first, details after).
+build_report() {
+  local ref=${1:-}
+  sec_header
+  G diff --name-status --no-renames "$OLD" "$NEW" -- "${PATHSPEC[@]}" >"$T/ns"
+  sec_bins
+  sec_bindings
+  sec_themes
+  sec_templates
+  sec_shell
+  sec_migrations
+  sec_overrides
+  {
+    echo "# Upstream sync: $(short "$OLD") -> $(short "$NEW")"
+    echo
+    echo "- date: $(date +%F)"
+    echo "- requested ref: ${ref:-default branch HEAD}"
+    echo "- old pin: \`$OLD\`"
+    echo "- new pin: \`$NEW\`"
+    echo
+    echo "## Summary"
+    summary_lines
+    echo
+    echo "## Bins"; cat "$T/bins.md"
+    echo; echo "## Hyprland bindings (default/hypr/bindings)"; cat "$T/bindings.md"
+    echo; echo "## Themes"; cat "$T/themes.md"
+    echo; echo "## Themed templates"; cat "$T/templates.md"
+    echo; echo "## Shell plugins"; cat "$T/shell.md"
+    echo; echo "## Migrations added (userland review; they are not vendored or run)"; cat "$T/migrations.md"
+    echo; echo "## Override drift"; cat "$T/overrides.md"
+  } >"$T/report.md"
+}
+
+summary_lines() {
+  echo "- commits: $C_COMMITS"
+  echo "- bins: +$C_BIN_A / -$C_BIN_D / ~$C_BIN_M changed"
+  echo "- hypr bindings: +$C_BIND_A / -$C_BIND_D lines"
+  echo "- themes: +$C_THEME_A / -$C_THEME_D / ~$C_THEME_M changed"
+  echo "- themed templates: +$C_TPL_A / -$C_TPL_D / ~$C_TPL_M changed"
+  echo "- shell plugins changed: $C_SHELL_PLUGINS plugins ($C_SHELL_FILES files under shell/)"
+  echo "- migrations added: $C_MIG ($C_MIG_FLAG touching overlay-owned paths)"
+  echo "- overrides: $C_OV tracked, $C_OV_CHANGED drifted, $C_OV_REMOVED removed upstream"
+}
+
+# --------------------------------------------------------------- preconditions
+
+PRE_FAILED=0
+pre_fail() {
+  if ((DRY_RUN)); then
+    warn "precondition failed (a real run would abort): $*"
+    PRE_FAILED=1
+  else
+    die "precondition failed: $*"
+  fi
+}
+
+preconditions() {
+  local dirty out
+  git ls-remote --exit-code "$URL" HEAD >/dev/null 2>&1 || pre_fail "network: cannot reach $URL"
+  git -C "$SRC" rev-parse --git-dir >/dev/null 2>&1 || die "$SRC is not a git worktree"
+  dirty=$(git -C "$SRC" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.atl/?$' || true)
+  [[ -z $dirty ]] || pre_fail "dirty chezmoi source worktree (commit or stash first):
+$dirty"
+  if out=$(chezmoi diff --exclude=scripts 2>&1); then
+    [[ -z $out ]] || pre_fail "chezmoi diff is not empty; applying would clobber local edits (run chezmoi diff)"
+  else
+    pre_fail "chezmoi diff failed: $out"
+  fi
+}
+
+# --------------------------------------------------------------------- checks
+
+HYPR_OK=0
+detect_hypr() {
+  local d
+  [[ ${UPSTREAM_SYNC_SKIP_SESSION:-0} == 1 ]] && return 0
+  command -v hyprctl >/dev/null 2>&1 || return 0
+  if [[ -z ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+    d=$(find "${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null |
+      sort -n | tail -n 1 | cut -d' ' -f2-)
+    [[ -n $d ]] && export HYPRLAND_INSTANCE_SIGNATURE=${d##*/}
+  fi
+  [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && hyprctl version >/dev/null 2>&1 && HYPR_OK=1
+  return 0
+}
+
+# Check functions: rc 0 pass, 77 skip (message on stdout), other = fail.
+chk_chezmoi_diff() {
+  local out
+  out=$(chezmoi diff --exclude=scripts 2>&1) || { echo "chezmoi diff failed: $out"; return 1; }
+  [[ -z $out ]] || { echo "chezmoi diff not empty after apply:"; printf '%s\n' "$out" | sed -n '1,40p'; return 1; }
+}
+
+chk_bash_syntax() {
+  local f base target first n=0 skipped=0 bad=0
+  for f in "$SRC"/dot_local/bin/*; do
+    [[ -f $f ]] || continue
+    base=${f##*/}
+    base=${base#executable_}
+    target=$f
+    if [[ $base == *.tmpl ]]; then
+      target=$HOME/.local/bin/${base%.tmpl}
+      [[ -f $target ]] || { skipped=$((skipped + 1)); continue; }
+    fi
+    first=""
+    IFS= read -r first <"$target" || true
+    if [[ ! $first =~ ^#!.*(bash|/sh) ]]; then
+      skipped=$((skipped + 1))
+      continue
+    fi
+    n=$((n + 1))
+    if ! bash -n "$target" 2>&1; then
+      echo "syntax error in $target"
+      bad=$((bad + 1))
+    fi
+  done
+  echo "$n scripts checked, $skipped skipped (non-bash or unrendered template)"
+  ((bad == 0))
+}
+
+chk_theme() {
+  local state=$HOME/.local/state/omarchy/current cur
+  [[ -f $state/theme.name ]] || { echo "no current theme recorded"; return 77; }
+  command -v omarchy-theme-set >/dev/null 2>&1 || { echo "omarchy-theme-set not on PATH"; return 77; }
+  cur=$(<"$state/theme.name")
+  omarchy-theme-set "$cur" >/dev/null 2>&1 || { echo "omarchy-theme-set '$cur' failed"; return 1; }
+  if grep -rnF '{{' "$state/theme" 2>/dev/null | sed -n '1,10p' | grep .; then
+    echo "unrendered placeholders left under $state/theme"
+    return 1
+  fi
+  [[ $(<"$state/theme.name") == "$cur" ]] || { echo "theme changed from '$cur'"; return 1; }
+  echo "theme '$cur' re-applied"
+}
+
+chk_hypr() {
+  local errs
+  ((HYPR_OK)) || { echo "no Hyprland session"; return 77; }
+  hyprctl reload >/dev/null 2>&1 || { echo "hyprctl reload failed"; return 1; }
+  sleep 1
+  errs=$(hyprctl configerrors 2>&1 | sed '/^[[:space:]]*$/d') || true
+  [[ -z $errs ]] || { echo "$errs"; return 1; }
+  echo "reloaded, no config errors"
+}
+
+shell_ping() { omarchy-shell shell ping >/dev/null 2>&1; }
+
+# Restart only when the shell tree changed and the session is not locked.
+# rc 0 restarted, 10 not needed, 11 left to the user, other = failed.
+SHELL_NOTE=""
+restart_shell_if_safe() {
+  local locking
+  if ! awk -F'\t' '$2 ~ /^shell\// { f = 1 } END { exit !f }' "$T/ns"; then return 10; fi
+  command -v omarchy-restart-shell >/dev/null 2>&1 || { SHELL_NOTE="omarchy-restart-shell missing"; return 11; }
+  locking=$(omarchy-shell lock status 2>/dev/null | jq -r '.secure or .requested' 2>/dev/null) || locking=""
+  if [[ $locking != false ]]; then
+    SHELL_NOTE="lock state is '${locking:-unknown}'; not restarting the shell automatically"
+    return 11
+  fi
+  omarchy-restart-shell >/dev/null 2>&1
+}
+
+chk_shell() {
+  local rc=0
+  ((HYPR_OK)) || { echo "no Hyprland session"; return 77; }
+  command -v omarchy-shell >/dev/null 2>&1 || { echo "omarchy-shell not on PATH"; return 77; }
+  shell_ping || { echo "omarchy-shell shell ping failed"; return 1; }
+  restart_shell_if_safe || rc=$?
+  case $rc in
+    0) shell_ping || { echo "shell did not answer after restart"; return 1; }; echo "ping ok; shell restarted (tree changed)" ;;
+    10) echo "ping ok; shell tree unchanged" ;;
+    11) echo "ping ok; shell tree changed, run omarchy-restart-shell yourself ($SHELL_NOTE)" ;;
+    *) echo "omarchy-restart-shell failed"; return 1 ;;
+  esac
+}
+
+# <name> <function>: records the result in CHECKS; returns 1 on failure.
+run_check() {
+  local name=$1 fn=$2 out rc=0 first
+  log "check: $name"
+  out=$("$fn" 2>&1) || rc=$?
+  first=$(printf '%s' "$out" | sed -n '1p')
+  case $rc in
+    0) CHECKS+=("- PASS $name${first:+: $first}") ;;
+    77) CHECKS+=("- SKIP $name${first:+: $first}"); warn "$name skipped: $first" ;;
+    *)
+      CHECKS+=("- FAIL $name${first:+: $first}")
+      printf '%s\n' "$out" >&2
+      return 1
+      ;;
+  esac
+}
+
+# ---------------------------------------------------------------------- apply
+
+apply_landing() {
+  chezmoi apply --force --no-tty --exclude=scripts "$LANDING"
+}
+
+# Removed-upstream files linger (the external is not exact): drop them.
+remove_stale() {
+  local st path n=0
+  while IFS=$'\t' read -r st path; do
+    [[ $st == D ]] || continue
+    if [[ -f $LANDING/$path ]]; then
+      rm -f "$LANDING/$path"
+      n=$((n + 1))
+    fi
+  done <"$T/ns"
+  log "removed $n files that upstream deleted from $LANDING"
+}
+
+rollback() {
+  local why=$1
+  trap - ERR INT TERM
+  set +e
+  warn "$why: restoring pin $(short "$OLD")"
+  pin_set_commit "$SRC/$PIN_REL" "$OLD"
+  if apply_landing; then
+    log "old pin re-applied"
+    restart_shell_if_safe
+  else
+    warn "re-applying the old pin failed; run: chezmoi apply $LANDING"
+  fi
+  exit 1
+}
+
+commit_sync() {
+  local report_rel
+  report_rel=$REPORT_DIR_REL/$(date +%F)-$(short "$NEW").md
+  mkdir -p "$SRC/$REPORT_DIR_REL"
+  { cat "$T/report.md"; echo; echo "## Checks"; printf '%s\n' "${CHECKS[@]}"; } >"$SRC/$report_rel"
+  git -C "$SRC" add -f -- "$PIN_REL" "$report_rel"
+  git -C "$SRC" commit --quiet -m "chore(omarchy): sync upstream to $(short "$NEW")" \
+    -m "$(printf 'Pin: %s -> %s\n\n%s\n\nReport: %s' "$OLD" "$NEW" "$(summary_lines)" "$report_rel")" \
+    -- "$PIN_REL" "$report_rel"
+  log "committed pin + report"
+  printf 'report: %s\n' "$SRC/$report_rel"
+}
+
+# ------------------------------------------------------------ accept-override
+
+accept_override() {
+  local key=$1 pin=$SRC/$PIN_REL file sha
+  if ! pin_overrides "$pin" | cut -f1 | grep -qxF "$key"; then
+    if pin_overrides "$pin" | cut -f1 | grep -qxF "bin/$key"; then
+      key=bin/$key
+    else
+      die "'$1' is not in the overrides table of $PIN_REL (known: $(pin_overrides "$pin" | cut -f1 | tr '\n' ' '))"
+    fi
+  fi
+  LANDING=$HOME/$(pin_landing "$pin")
+  file=$LANDING/$key
+  [[ -f $file ]] || die "$file does not exist; apply the pinned external first (chezmoi apply $LANDING)"
+  sha=$(sha256sum "$file" | awk '{ print $1 }')
+  pin_set_override_sha "$pin" "$key" "$sha"
+  log "recorded sha256 $sha for $key (taken from the applied $LANDING)"
+  git -C "$SRC" diff --stat -- "$PIN_REL" >&2
+  log "review and commit $PIN_REL together with the ported override"
+}
+
+# ----------------------------------------------------------------------- main
+
+cleanup() {
+  [[ -n $T ]] && rm -rf "$T"
+  return 0
+}
+
+main() {
+  local ref="" accept="" arg
+  while (($#)); do
+    arg=$1
+    case $arg in
+      --dry-run) DRY_RUN=1 ;;
+      --accept-override)
+        (($# >= 2)) || die "--accept-override needs a path"
+        accept=$2
+        shift
+        ;;
+      -h | --help) usage; exit 0 ;;
+      -*) usage >&2; exit 2 ;;
+      *)
+        [[ -z $ref ]] || die "only one <ref> allowed"
+        ref=$arg
+        ;;
+    esac
+    shift
+  done
+
+  SRC=${UPSTREAM_SYNC_SOURCE:-$(chezmoi source-path)}
+  [[ -d $SRC ]] || die "chezmoi source dir not found: $SRC"
+  [[ -f $SRC/$PIN_REL ]] || die "pin file missing: $SRC/$PIN_REL"
+  [[ -f $SRC/$EXT_REL ]] || die "external template missing: $SRC/$EXT_REL"
+
+  if [[ -n $accept ]]; then
+    ((DRY_RUN == 0 && ${#ref} == 0)) || die "--accept-override takes no other arguments"
+    accept_override "$accept"
+    return 0
+  fi
+
+  OLD=$(pin_commit "$SRC/$PIN_REL")
+  [[ $OLD =~ ^[0-9a-f]{40}$ ]] || die "cannot read the pinned commit from $PIN_REL"
+  LANDING=$HOME/$(pin_landing "$SRC/$PIN_REL")
+  build_pathspec "$SRC/$EXT_REL"
+
+  T=$(mktemp -d)
+  trap cleanup EXIT
+
+  preconditions
+  ensure_cache
+  NEW=$(resolve_ref "$ref")
+  have_commit "$OLD" || fetch_commit "$OLD"
+  have_commit "$OLD" || die "pinned commit $OLD is not in upstream history"
+
+  if [[ $OLD == "$NEW" ]]; then
+    log "already at pin $(short "$OLD"); nothing to do"
+    return 0
+  fi
+
+  log "building report $(short "$OLD") -> $(short "$NEW")"
+  build_report "$ref"
+  cat "$T/report.md"
+
+  if ((DRY_RUN)); then
+    log "dry-run: nothing changed$( ((PRE_FAILED)) && echo ' (preconditions would have aborted a real run)')"
+    return 0
+  fi
+
+  detect_hypr
+  trap 'rollback "interrupted"' INT TERM
+  trap 'rollback "unexpected error"' ERR
+  pin_set_commit "$SRC/$PIN_REL" "$NEW"
+  log "pin rewritten to $(short "$NEW"); applying $LANDING"
+  apply_landing || rollback "chezmoi apply of the landing dir failed"
+  remove_stale
+  run_check "chezmoi diff empty" chk_chezmoi_diff || rollback "check failed (chezmoi diff)"
+  run_check "bash -n dot_local/bin" chk_bash_syntax || rollback "check failed (bash -n)"
+  run_check "theme-set current theme" chk_theme || rollback "check failed (theme-set)"
+  run_check "hyprctl reload + configerrors" chk_hypr || rollback "check failed (hyprctl)"
+  run_check "omarchy-shell ping" chk_shell || rollback "check failed (shell)"
+  trap - ERR INT TERM
+  commit_sync
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  set -eEuo pipefail
+  main "$@"
+fi

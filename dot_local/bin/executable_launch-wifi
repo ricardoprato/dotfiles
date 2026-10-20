@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Launch the wifi controls (nmtui with NetworkManager, Impala TUI with iwd).
+# With NetworkManager active it opens nmtui. Otherwise it falls back to Impala,
+# which checks geteuid() == 0 before allowing "share network" — runs via sudo
+# so that feature works. Requires /etc/sudoers.d/impala granting NOPASSWD.
+
+rfkill unblock wifi
+
+if systemctl is-active --quiet NetworkManager; then
+  APP_ID="org.omarchy.nmtui"
+  LAUNCH_COMMAND="uwsm-app -- xdg-terminal-exec --app-id=$APP_ID -e nmtui"
+else
+  APP_ID="org.omarchy.impala"
+  LAUNCH_COMMAND="uwsm-app -- xdg-terminal-exec --app-id=$APP_ID -e sudo /usr/bin/impala"
+fi
+exec omarchy-launch-or-focus "$APP_ID" "$LAUNCH_COMMAND"

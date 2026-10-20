@@ -1,0 +1,106 @@
+{{/*
+  Machine-local chezmoi config — the single manifest that decides what this
+  machine is. Rendered by `chezmoi init` to ~/.config/chezmoi/chezmoi.toml and
+  never committed.
+
+  promptStringOnce / promptBoolOnce only ask when the key is not already set,
+  so re-running `chezmoi init` never clobbers existing answers. To change an
+  answer later, edit ~/.config/chezmoi/chezmoi.toml directly (or delete the
+  key and re-run `chezmoi init`).
+
+  Feature units compose freely: work-only, gaming-only, both, neither.
+  Package sets per unit live in .chezmoidata/packages.toml; file-level gating
+  lives in .chezmoiignore.
+*/ -}}
+
+{{- $email := promptStringOnce . "email" "Git author email" -}}
+{{- $name  := promptStringOnce . "name"  "Git author name" -}}
+{{- $spotifyClientId := promptStringOnce . "spotify.clientId" "Spotify client ID (empty to skip spotify-player integration)" "" -}}
+
+{{/* ---------------------------------------------------------------------
+     Feature units
+     --------------------------------------------------------------------- */}}
+{{- $work    := promptBoolOnce . "features.work"    "Enable work unit (containers, VMs, runtimes, VPN clients)" true -}}
+{{- $content := promptBoolOnce . "features.content" "Enable content unit (Blender, GIMP, OBS, audio plugins)" true -}}
+{{- $gaming  := promptBoolOnce . "features.gaming"  "Enable gaming unit (Steam/Proton, gamescope, gamemode, emulation)" false -}}
+
+{{/* ---------------------------------------------------------------------
+     Platform — native Linux vs Arch under WSL2. WSL is CLI-only: the
+     installer and .chezmoiignore skip every desktop concern on it. An
+     explicit answer wins; an empty one autodetects from the kernel release
+     (WSL2 kernels carry "microsoft") and the result is written to the
+     manifest. Declared before gpu because WSL has no PCI bus to probe.
+     --------------------------------------------------------------------- */}}
+{{- $platform := promptStringOnce . "platform" "Platform (native|wsl, empty = autodetect)" "" -}}
+{{- if eq $platform "" -}}
+{{-   $kernel := lower (output "bash" "-c" "cat /proc/sys/kernel/osrelease 2>/dev/null || true") -}}
+{{-   if contains "microsoft" $kernel -}}
+{{-     $platform = "wsl" -}}
+{{-   else -}}
+{{-     $platform = "native" -}}
+{{-   end -}}
+{{- end -}}
+{{- if not (has $platform (list "native" "wsl")) -}}
+{{-   fail (printf "platform must be native or wsl, got %q" $platform) -}}
+{{- end -}}
+
+{{/* ---------------------------------------------------------------------
+     GPU vendor — drives the driver set and the gaming runtime's env.
+     An explicit answer wins; an empty answer autodetects from lspci and the
+     resolved value is written to the manifest, so detection happens once.
+     Re-detect by setting gpu = "" in ~/.config/chezmoi/chezmoi.toml.
+     Discrete NVIDIA is checked first so hybrid laptops resolve to the dGPU.
+     On WSL there is no PCI bus to probe, so autodetect resolves to "unknown".
+     --------------------------------------------------------------------- */}}
+{{- $gpu := promptStringOnce . "gpu" "GPU vendor (amd|nvidia|intel, empty = autodetect)" "" -}}
+{{- if and (eq $gpu "") (eq $platform "wsl") -}}
+{{-   $gpu = "unknown" -}}
+{{- else if eq $gpu "" -}}
+{{-   $pci := lower (output "bash" "-c" "lspci -nn 2>/dev/null | grep -Ei 'vga compatible|3d controller|display controller' || true") -}}
+{{-   if contains "nvidia" $pci -}}
+{{-     $gpu = "nvidia" -}}
+{{-   else if or (contains "amd/ati" $pci) (contains "advanced micro devices" $pci) -}}
+{{-     $gpu = "amd" -}}
+{{-   else if contains "intel" $pci -}}
+{{-     $gpu = "intel" -}}
+{{-   else -}}
+{{-     $gpu = "unknown" -}}
+{{-   end -}}
+{{- end -}}
+{{- if not (has $gpu (list "amd" "nvidia" "intel" "unknown")) -}}
+{{-   fail (printf "gpu must be one of amd|nvidia|intel|unknown, got %q" $gpu) -}}
+{{- end -}}
+
+{{/* ---------------------------------------------------------------------
+     Chassis — laptop vs desktop. Tunes the gaming runtime (render
+     resolution, CPU governor, MangoHud battery readout) and nothing else.
+     DMI chassis types: 8 portable, 9 laptop, 10 notebook, 11 handheld,
+     14 sub-notebook, 30 tablet, 31 convertible, 32 detachable.
+     --------------------------------------------------------------------- */}}
+{{- $chassis := promptStringOnce . "chassis" "Chassis (laptop|desktop, empty = autodetect)" "" -}}
+{{- if eq $chassis "" -}}
+{{-   $dmi := trim (output "bash" "-c" "cat /sys/class/dmi/id/chassis_type 2>/dev/null || echo 3") -}}
+{{-   if has $dmi (list "8" "9" "10" "11" "14" "30" "31" "32") -}}
+{{-     $chassis = "laptop" -}}
+{{-   else -}}
+{{-     $chassis = "desktop" -}}
+{{-   end -}}
+{{- end -}}
+{{- if not (has $chassis (list "laptop" "desktop")) -}}
+{{-   fail (printf "chassis must be laptop or desktop, got %q" $chassis) -}}
+{{- end -}}
+
+[data]
+    email    = {{ $email    | quote }}
+    name     = {{ $name     | quote }}
+    platform = {{ $platform | quote }}
+    gpu      = {{ $gpu      | quote }}
+    chassis  = {{ $chassis  | quote }}
+
+[data.features]
+    work    = {{ $work }}
+    content = {{ $content }}
+    gaming  = {{ $gaming }}
+
+[data.spotify]
+    clientId = {{ $spotifyClientId | quote }}

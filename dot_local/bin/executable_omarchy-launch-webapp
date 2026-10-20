@@ -1,0 +1,57 @@
+#!/bin/bash
+# Override of upstream bin/omarchy-launch-webapp (basecamp/omarchy @ 3ac43659), whole-file replacement.
+# Modified copy of an Omarchy file: MIT, (c) David Heinemeier Hansson; see NOTICE.
+# Why: chromium fallback when the default browser has no --app= (Zen/Firefox). Pin entry: .chezmoidata/omarchy.toml
+
+# omarchy:summary=Launch a URL as a web app in a Chromium-family browser
+# omarchy:args=<url>
+
+# Web apps need chromium's --app= (chromeless PWA window). When the default
+# browser can't do that (Firefox family), we borrow an installed chromium
+# instead of degrading to a full browser window — the default browser stays
+# whatever the user picked for normal browsing.
+CHROMIUM_BINS=(chromium chromium-browser brave brave-browser google-chrome-stable google-chrome microsoft-edge-stable microsoft-edge vivaldi-stable helium)
+
+browser=$(xdg-settings get default-web-browser)
+
+# Match the desktop file family — names can be canonical (google-chrome.desktop)
+# or user-installed PWA variants (userapp-Zen-XXX.desktop) so we lowercase first.
+browser_lc=$(echo "$browser" | tr '[:upper:]' '[:lower:]')
+
+mode=app  # default: chromium-style --app=<url> (chromeless PWA window)
+exec_bin=""
+
+case $browser_lc in
+  google-chrome*|brave*|microsoft-edge*|opera*|vivaldi*|helium*|chromium*)
+    exec_bin=$(sed -n 's/^Exec=\([^ ]*\).*/\1/p' {~/.local,~/.nix-profile,/usr}/share/applications/$browser 2>/dev/null | head -1)
+    ;;
+  *)
+    # Default browser has no --app= support (or is unknown): find any chromium.
+    for bin in "${CHROMIUM_BINS[@]}"; do
+      exec_bin=$(command -v "$bin") && break
+      exec_bin=""
+    done
+
+    if [[ -z $exec_bin ]]; then
+      # No chromium anywhere — open a plain window in the default browser.
+      mode=window
+      case $browser_lc in
+        *zen*)       browser="zen.desktop" ;;
+        *firefox*)   browser="firefox.desktop" ;;
+        *librewolf*) browser="librewolf.desktop" ;;
+      esac
+      exec_bin=$(sed -n 's/^Exec=\([^ ]*\).*/\1/p' {~/.local,~/.nix-profile,/usr}/share/applications/$browser 2>/dev/null | head -1)
+    fi
+    ;;
+esac
+
+if [[ -z $exec_bin ]]; then
+  notify-send -u critical "Web app launcher" "No browser binary found for web apps" 2>/dev/null
+  exit 1
+fi
+
+if [[ $mode == app ]]; then
+  exec setsid uwsm-app -- "$exec_bin" --app="$1" "${@:2}"
+else
+  exec setsid uwsm-app -- "$exec_bin" --new-window "$1" "${@:2}"
+fi

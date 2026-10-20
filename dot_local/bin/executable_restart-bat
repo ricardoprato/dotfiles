@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Re-render bat's config from the current omarchy theme.
+# Run by ~/.config/omarchy/hooks/theme-set.d/10-bat after every theme switch.
+
+exec chezmoi apply "$HOME/.config/bat/config"

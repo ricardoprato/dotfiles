@@ -1,0 +1,55 @@
+# Single source of truth for the upstream omarchy that .chezmoiexternal.toml.tmpl
+# fetches (github.com/basecamp/omarchy, archive of this exact commit).
+# Bump `commit` to move the pin; the URL changes, so chezmoi fetches the new
+# archive on the next apply. No archive checksum on purpose: the commit sha is
+# content-addressed, and GitHub does not promise byte-stable tarballs.
+[omarchy]
+commit = "3ac43659dcbf88e84d951e3ce979b48a60a7d1f2"
+# Target dir (relative to $HOME) the archive extracts into.
+landing = ".local/share/omarchy-upstream"
+
+# Files this fork replaces wholesale. `sha256` is the upstream file at `commit`
+# the override was forked from; a sync compares it with the new upstream file
+# and reports drift. Paths are relative to the upstream tree root.
+[omarchy.overrides."bin/omarchy-launch-webapp"]
+sha256 = "3db5c233b1d9b42ce6d0bbfe752e814ddc6643214ad9c8be30fefabcd8602a68"
+why = "chromium fallback when the default browser has no --app= (Zen/Firefox)"
+
+[omarchy.overrides."bin/omarchy-theme-set-browser"]
+sha256 = "af8ac9a68694f04d6b3eea583f517010a6dc314a85996d0b4138972e8af89d6c"
+why = "writes /etc/*/policies/managed/color.json directly; no packaged policy helper or sudoers here"
+
+[omarchy.overrides."bin/omarchy-sudo-passwordless"]
+sha256 = "69028d6932930a992ac57599dd0a8823d08fefcd665679d46993fe975a8e7eb7"
+why = "upstream is package-bound (/usr/bin self path, libalpm hook); frozen copy of the old tool"
+
+[omarchy.overrides."bin/omarchy-restart-app"]
+sha256 = "40a49c75c3801382bb4dd3502f9ab23469b27eb36f6b554093a63f242953ee23"
+why = "restart via the systemd user unit when it exists, else pkill"
+
+[omarchy.overrides."bin/omarchy-system-lock"]
+sha256 = "f1953110658d819597d3c9d8df616350c362ee4c257227fcbdefac8275bbd596"
+why = "rbw lock instead of 1password --lock"
+
+[omarchy.overrides."bin/omarchy-powerprofiles-list"]
+sha256 = "3d2e4b3d5ad974aa78c97a653d3fe937bd263063369a57f14918748502d1f609"
+why = "powerprofilesctl pinned to /usr/bin (mise python lacks gi)"
+
+[omarchy.overrides."bin/omarchy-powerprofiles-set"]
+sha256 = "3dd63e539a26d1a8bc1338394ef0c2ba29920ef76db5dfdd85b54d67af35e98a"
+why = "powerprofilesctl pinned to /usr/bin (mise python lacks gi)"
+
+[omarchy.overrides."bin/omarchy-theme-set-glass"]
+sha256 = "92ff921f1083b7eebf75423f7467dc770c9369ba8aacb9a87443e651e5c85d16"
+why = "drop the ~/.config/gtk-4.0/gtk.css import block (gtk-4.0 is a theme symlink)"
+
+# Older upstream versions kept as-is: they predate the pinned upstream and the
+# upstream tools were rewritten since (package-bound / different design).
+# Hashes are the current upstream files, recorded so a sync flags any change.
+[omarchy.overrides."bin/omarchy-menu-keybindings"]
+sha256 = "ef49c997bca9418f1e905b45f8bda5c8018097efaf88e0d54337199406a837f3"
+why = "frozen older version of the keybindings menu (xkb keycode fallback map); upstream rewrote it"
+
+[omarchy.overrides."bin/omarchy-windows-vm"]
+sha256 = "8379eca8f59ec45f9df41710bc0a6f525a9db87ccb62d00659ccab2a2e04e24b"
+why = "frozen older version of the Windows VM tool (user compose file, no polkit-gated root dir)"

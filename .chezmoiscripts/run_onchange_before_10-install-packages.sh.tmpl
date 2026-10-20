@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+# Install the package sets for the feature units enabled in the machine-local
+# manifest (~/.config/chezmoi/chezmoi.toml, [data.features]) plus the driver
+# set for data.gpu. Sets live in .chezmoidata/packages.toml.
+#
+# data.platform decides the shape: native installs base+desktop (plus
+# work+workDesktop, content, gaming and the GPU set per the manifest); wsl is
+# CLI-only and installs base (plus work, the headless half) — desktop,
+# workDesktop, content, gaming and GPU drivers are all skipped.
+#
+# run_onchange_: chezmoi hashes the rendered script, so this re-runs exactly
+# when the effective package list changes — add a package to packages.toml and
+# the next `chezmoi apply` installs it. The list is sorted and deduped at
+# render time so the hash is stable across unrelated edits.
+#
+# This script only ever ADDS. Flipping a unit off leaves its packages
+# installed; reclaim them with `pacman -Qqtd | sudo pacman -Rns -` (orphans)
+# or by removing them explicitly.
+#
+# Skip with: DOTFILES_SKIP_PACKAGES=1 chezmoi apply
+
+set -euo pipefail
+
+{{/* -------- resolve the effective package sets -------------------------- */}}
+{{- $work    := dig "features" "work"    false . -}}
+{{- $content := dig "features" "content" false . -}}
+{{- $gaming  := dig "features" "gaming"  false . -}}
+{{- $gpu     := dig "gpu" "unknown" . -}}
+{{- $platform := dig "platform" "native" . -}}
+{{- $wsl     := eq $platform "wsl" -}}
+{{- if $wsl -}}
+{{-   $content = false -}}
+{{-   $gaming  = false -}}
+{{-   $gpu     = "unknown" -}}
+{{- end -}}
+{{- if not (hasKey .gpuPackages $gpu) -}}
+{{-   $gpu = "unknown" -}}
+{{- end -}}
+{{- $gpuSet := index .gpuPackages $gpu -}}
+
+{{- $units  := list "base" -}}
+{{- $pacman := .packages.base.pacman -}}
+{{- $aur    := .packages.base.aur -}}
+
+{{- if not $wsl -}}
+{{-   $units  = append $units "desktop" -}}
+{{-   $pacman = concat $pacman .packages.desktop.pacman -}}
+{{-   $aur    = concat $aur    .packages.desktop.aur -}}
+{{- end -}}
+{{- if $work -}}
+{{-   $units  = append $units "work" -}}
+{{-   $pacman = concat $pacman .packages.work.pacman -}}
+{{-   $aur    = concat $aur    .packages.work.aur -}}
+{{-   if not $wsl -}}
+{{-     $units  = append $units "workDesktop" -}}
+{{-     $pacman = concat $pacman .packages.workDesktop.pacman -}}
+{{-     $aur    = concat $aur    .packages.workDesktop.aur -}}
+{{-   end -}}
+{{- end -}}
+{{- if $content -}}
+{{-   $units  = append $units "content" -}}
+{{-   $pacman = concat $pacman .packages.content.pacman -}}
+{{-   $aur    = concat $aur    .packages.content.aur -}}
+{{- end -}}
+{{- if $gaming -}}
+{{-   $units  = append $units "gaming" -}}
+{{-   $pacman = concat $pacman .packages.gaming.pacman -}}
+{{-   $aur    = concat $aur    .packages.gaming.aur -}}
+{{- end -}}
+
+{{/* GPU drivers on native machines (WSL gets its GPU from the Windows host);
+     their 32-bit halves only when gaming needs multilib */}}
+{{- if not $wsl -}}
+{{-   $pacman = concat $pacman $gpuSet.pacman -}}
+{{-   $aur    = concat $aur    $gpuSet.aur -}}
+{{-   if $gaming -}}
+{{-     $pacman = concat $pacman $gpuSet.pacman32 -}}
+{{-   end -}}
+{{- end -}}
+
+{{- $pacman = $pacman | uniq | sortAlpha -}}
+{{- $aur    = $aur    | uniq | sortAlpha -}}
+
+readonly UNITS={{ join "+" $units | quote }}
+readonly PLATFORM={{ $platform | quote }}
+readonly GPU={{ $gpu | quote }}
+
+readonly PACMAN_PKGS=(
+{{ range $pacman }}  {{ . | quote }}
+{{ end }})
+
+readonly AUR_PKGS=(
+{{ range $aur }}  {{ . | quote }}
+{{ end }})
+
+log() { printf '[packages] %s\n' "$*"; }
+
+if [[ -n ${DOTFILES_SKIP_PACKAGES:-} ]]; then
+  log "DOTFILES_SKIP_PACKAGES set — skipping"
+  exit 0
+fi
+
+if ! command -v pacman >/dev/null 2>&1; then
+  log "pacman not found — not an Arch system, skipping"
+  exit 0
+fi
+
+log "platform: ${PLATFORM} | units: ${UNITS} | gpu: ${GPU}"
+log "${#PACMAN_PKGS[@]} repo packages, ${#AUR_PKGS[@]} AUR packages"
+
+{{ if $gaming -}}
+# The gaming unit pulls lib32-* (Steam, Wine, 32-bit Vulkan), which need the
+# multilib repo. Enabling it is idempotent and reversible.
+if ! pacman-conf --repo-list | grep -qx multilib; then
+  log "gaming unit requires [multilib] — enabling it in /etc/pacman.conf"
+  sudo sed -i '/^#\[multilib\]/,+1 s/^#//' /etc/pacman.conf
+  sudo pacman -Sy
+fi
+{{ end -}}
+
+sudo pacman -S --needed --noconfirm "${PACMAN_PKGS[@]}"
+
+{{ if $gaming }}
+# gamemode's privileged helpers (CPU governor, GPU clocks, /proc/sys) are denied
+# outright by the shipped polkit policy — allow_active=no on every action — and
+# re-granted without authentication to the `gamemode` group by the package's own
+# rule in /usr/share/polkit-1/rules.d/gamemode.rules. Without membership every
+# helper fails and gamemode logs an error per launch.
+if getent group gamemode >/dev/null 2>&1 && ! id -nG "$(id -un)" | grep -qw gamemode; then
+  log "adding $(id -un) to the gamemode group (takes effect at next login)"
+  sudo usermod -aG gamemode "$(id -un)"
+fi
+{{ if or (eq $gpu "amd") (eq $gpu "nvidia") }}
+# gamemode refuses its [gpu] section from any config file the invoking user can
+# write, so it cannot live in ~/.config/gamemode.ini alongside the rest. Only
+# this root-owned half is trusted. The DRM card index is detected rather than
+# assumed to be 0 — this laptop has no card0 at all.
+gm_card=0
+for gm_c in /sys/class/drm/card[0-9]*; do
+  case "$gm_c" in *-*) continue ;; esac
+  if [ -r "$gm_c/device/vendor" ]; then
+    gm_card=$(basename "$gm_c" | tr -dc 0-9)
+    break
+  fi
+done
+printf '%s\n' \
+  '# Managed by chezmoi, gaming unit. Root-owned half of the gamemode config:' \
+  '# [gpu] is ignored from user-writable files. The rest lives in' \
+  '# ~/.config/gamemode.ini.' \
+  '[gpu]' \
+  'apply_gpu_optimisations=accept-responsibility' \
+  "gpu_device=${gm_card}" \
+  {{ if eq $gpu "amd" }}'amd_performance_level=high'{{ else }}'nv_powermizer_mode=1'{{ end }} \
+  | sudo tee /etc/gamemode.ini >/dev/null
+log "wrote /etc/gamemode.ini (gpu_device=${gm_card})"
+{{ end }}
+{{ end }}
+
+if (( ${#AUR_PKGS[@]} > 0 )); then
+  if ! command -v yay >/dev/null 2>&1; then
+    log "bootstrapping yay"
+    tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' EXIT
+    git clone --depth 1 https://aur.archlinux.org/yay-bin.git "$tmpdir/yay-bin"
+    (cd "$tmpdir/yay-bin" && makepkg -si --noconfirm)
+  fi
+  # ttfx's check() compares its easing curves bit-exactly against Python, and
+  # CachyOS builds Rust with -C target-cpu=native (FMA), which changes the last
+  # bit and fails the test although the binary works. Build it without check().
+  nocheck_pkgs=(ttfx)
+  regular=()
+  nocheck=()
+  for pkg in "${AUR_PKGS[@]}"; do
+    if [[ " ${nocheck_pkgs[*]} " == *" $pkg "* ]]; then
+      nocheck+=("$pkg")
+    else
+      regular+=("$pkg")
+    fi
+  done
+  if (( ${#regular[@]} > 0 )); then
+    yay -S --needed --noconfirm "${regular[@]}"
+  fi
+  if (( ${#nocheck[@]} > 0 )); then
+    yay -S --needed --noconfirm --mflags --nocheck "${nocheck[@]}"
+  fi
+fi
+
+log "done"

@@ -1,0 +1,53 @@
+{{- $gpu := dig "gpu" "unknown" . -}}
+{{- $chassis := dig "chassis" "desktop" . -}}
+; gamemode — optimisations applied for the lifetime of a process launched with
+; `gamemoderun` (the `game-run` wrapper does this for you).
+; Managed by chezmoi, gaming unit. Upstream reference:
+;   /usr/share/gamemode/gamemode.ini.example
+
+[general]
+; Nice the game above the rest of the session, and keep the compositor from
+; blanking during long cutscenes.
+renice=10
+ioprio=0
+inhibit_screensaver=1
+softrealtime=auto
+desiredgov=performance
+{{ if eq $chassis "laptop" }}
+; Integrated GPU in a power-limited chassis: CPU and GPU draw from one shared
+; TDP budget, so forcing the CPU to `performance` steals watts the GPU needs
+; and frametimes get worse, not better. When the GPU is pulling more than this
+; share of package power, hold the CPU at powersave instead. This single pair
+; of settings is the difference between stable and stuttery on an iGPU.
+igpu_desiredgov=powersave
+igpu_power_threshold=0.3
+{{ end }}
+[filter]
+; Empty whitelist: gamemode applies to any process that asks for it.
+
+; [gpu] lives in /etc/gamemode.ini, not here. gamemode refuses that section
+; from any config file the invoking user can write, so the options are silently
+; ignored (with three errors logged) if placed in this file. The gaming unit's
+; installer writes the root-owned half, detecting the DRM card index instead of
+; assuming 0 — this laptop has no card0.
+;
+; Those helpers also need group membership: the shipped polkit policy denies
+; every gamemode action outright (allow_active=no) and the package's own rule
+; re-grants them, without authentication, to the `gamemode` group. The
+; installer adds the user; it takes effect at the next login.
+;
+; Verify the whole chain with `gamemoded -t`. Note it reports a false renice
+; failure when run from a shell that is not at nice 0 — use `nice -n 4 gamemoded -t`
+; from a Claude Code shell, which runs at -4.
+
+[cpu]
+; Core parking and pinning help on multi-CCD desktop chips and hurt everywhere
+; else. Off until there is a machine that measurably benefits.
+park_cores=no
+pin_cores=no
+
+[custom]
+; Visible confirmation that gamemode actually engaged — the most common
+; failure mode is a launcher swallowing `gamemoderun` and nobody noticing.
+start={{ .chezmoi.homeDir }}/.local/share/omarchy-upstream/bin/omarchy-notification-send -g 󰊴 "GameMode on" "CPU/GPU tuned for gaming"
+end={{ .chezmoi.homeDir }}/.local/share/omarchy-upstream/bin/omarchy-notification-send -g 󰊴 "GameMode off" "Back to normal power profile"

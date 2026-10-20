@@ -1,0 +1,63 @@
+# Externally-managed git repos that chezmoi clones/pulls on apply.
+# These keep their own .git directory and standalone workflow (cd ~/.config/<repo>; git push)
+# while being declared as part of the bootstrap source-of-truth.
+
+[".config/nvim"]
+    type = "git-repo"
+    url = "git@github.com:ricardoprato/nvim.git"
+    refreshPeriod = "168h"
+    [".config/nvim".clone]
+        args = ["--branch", "feat/lazy-migration"]
+    [".config/nvim".pull]
+        args = ["--ff-only"]
+
+{{/* Upstream omarchy, pinned. The commit lives in .chezmoidata/omarchy.toml
+     (the single source of truth); the archive is fetched on apply and never
+     committed here. It lands side by side with the fork's own
+     ~/.local/share/omarchy until the cut-over tasks of
+     odd/tasks/omarchy-upstream-overlay.md repoint OMARCHY_PATH at it.
+
+     chezmoi facts this entry relies on (verified, chezmoi 2.73):
+     - include/exclude match archive member paths BEFORE stripComponents, so
+       every pattern starts with a wildcard component for the "omarchy-<sha>"
+       prefix directory.
+     - combining include and exclude does not filter: members matching neither
+       are kept. Hence exclude-only: new upstream top-level entries are
+       fetched by default, nothing is silently dropped.
+     - refreshPeriod 0 = download once per URL (cached under
+       ~/.cache/chezmoi), re-fetched only on `chezmoi apply
+       --refresh-externals=always` or when the commit (URL) changes.
+     - exact stays false: chezmoi does not delete extra files in the dir.
+     - never list a path inside this dir in .chezmoiremove ("inconsistent
+       state" error). Local edits to extracted files are reverted on apply.
+     Not vendored: etc/ (system package files), install/ except helpers/
+     (provisioning), migrations/, docs/manual/plans/scripts/test/agents,
+     .github and the 92 MB of theme intro videos. WSL drops shell/,
+     applications/ and the icon/logo files in .chezmoiignore. */ -}}
+[{{ .omarchy.landing | quote }}]
+    type = "archive"
+    url = "https://github.com/basecamp/omarchy/archive/{{ .omarchy.commit }}.tar.gz"
+    stripComponents = 1
+    refreshPeriod = "0"
+    exclude = [
+        "*/.github",
+        "*/.greptile",
+        "*/AGENTS.md",
+        "*/CLAUDE.md",
+        "*/agents",
+        "*/docs",
+        "*/etc",
+        "*/manual",
+        "*/migrations",
+        "*/plans",
+        "*/scripts",
+        "*/test",
+        "*/install/*.packages",
+        "*/install/config",
+        "*/install/hardware",
+        "*/install/login",
+        "*/install/post-install",
+        "*/install/provisioning",
+        "*/install/user",
+        "*/themes/*/backgrounds/intros",
+    ]

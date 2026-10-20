@@ -1,0 +1,15 @@
+#!/bin/bash
+# Override of upstream bin/omarchy-restart-app (basecamp/omarchy @ 3ac43659), whole-file replacement.
+# Modified copy of an Omarchy file: MIT, (c) David Heinemeier Hansson; see NOTICE.
+# Why: restart via the systemd user unit when it exists, else pkill. Pin entry: .chezmoidata/omarchy.toml
+
+# omarchy:summary=Restart an application — prefer user systemd unit, fall back to pkill+uwsm.
+# omarchy:args=<application-name> [application-args...]
+
+unit="$1.service"
+if /usr/bin/systemctl --user list-unit-files --quiet "$unit" 2>/dev/null | /usr/bin/grep -q "^$unit"; then
+  exec /usr/bin/systemctl --user restart "$unit"
+fi
+
+pkill -x "$1"
+setsid uwsm-app -- "$@" >/dev/null 2>&1 &

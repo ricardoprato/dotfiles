@@ -1,0 +1,84 @@
+CLAUDE.md
+odd
+tests
+LICENSE
+README.md
+NOTICE
+LICENSES
+.planning
+.worktrees
+system
+
+{{/* Feature-unit gating: files only reach $HOME when their unit is enabled in
+     the machine-local manifest. Paths here are TARGET paths (no dot_ /
+     executable_ prefixes). Package sets are gated separately, in
+     .chezmoiscripts/run_onchange_10-install-packages.sh.tmpl.
+
+     `dig` is used instead of a bare .features.gaming so a machine whose local
+     config predates the manifest degrades to "unit off" instead of dying with
+     a template error. Run `chezmoi init` to add the missing answers. */}}
+{{ if or (not (dig "features" "gaming" false .)) (eq (dig "platform" "native" .) "wsl") -}}
+.config/MangoHud
+.config/gamemode.ini
+.config/hypr/apps/gamescope.lua
+.local/bin/game-run
+{{ end -}}
+
+{{/* Platform gating: on WSL2 the machine is CLI-only, so nothing graphical
+     reaches $HOME. Kept on purpose: the user theme templates/overlays and the
+     bat hook in ~/.config/omarchy (upstream's omarchy-theme-set renders
+     starship/btop/bat from them), restart-bat, and the upstream external's bin/
+     and themes/ (generic omarchy-* helpers fish/tmux call: cmd-*, pkg-*,
+     transcode*, drive-*, version*, hook, state, menu-tmux-keybindings; every
+     omarchy-restart-* / omarchy-theme-* script, which tolerate their missing GUI
+     targets, and the theme-set.d hook that fires on a non-headless run). The
+     personal ~/.local/bin entries below are the desktop-only ones. Package
+     gating lives in the installer. */}}
+{{ if eq (dig "platform" "native" .) "wsl" -}}
+.XCompose
+.config/MangoHud
+.config/alacritty
+.config/brave-flags.conf
+.config/chromium
+.config/chromium-flags.conf
+.config/easyeffects
+.config/electron-flags.conf
+.config/environment.d
+.config/fcitx5
+.config/fontconfig
+.config/ghostty
+.config/hypr
+.config/hyprland-preview-share-picker
+.config/imv
+.config/kitty
+.config/obsidian
+.config/omarchy/themed/spotify-player.toml.tpl
+.config/spotify-player
+.config/systemd
+.config/uwsm
+.config/wiremix
+.config/xdg-terminals.list
+.local/share/applications
+.local/share/fonts
+.local/share/omarchy/bin
+.local/share/omarchy-upstream/applications
+.local/share/omarchy-upstream/icon.*
+.local/share/omarchy-upstream/logo.*
+.local/share/omarchy-upstream/shell
+.local/state/omarchy/settings
+.local/state/omarchy/toggles
+.local/bin/kitty-tab-picker
+.local/bin/yazi-kdeconnect-share
+.local/bin/network-migrate-networkmanager
+.local/bin/launch-wifi
+.local/bin/shell-lock-setup-pam
+.local/bin/hypr-monitor-workspaces
+.local/bin/omarchy-hibernation-*
+.local/bin/omarchy-hyprland-*
+.local/bin/omarchy-launch-*
+.local/bin/omarchy-menu-keybindings
+.local/bin/omarchy-powerprofiles-*
+.local/bin/omarchy-system-*
+.local/bin/omarchy-toggle-*
+.local/bin/omarchy-windows-vm
+{{ end -}}

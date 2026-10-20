@@ -1,0 +1,25 @@
+#!/bin/bash
+# Override of upstream bin/omarchy-system-lock (basecamp/omarchy @ 3ac43659), whole-file replacement.
+# Modified copy of an Omarchy file: MIT, (c) David Heinemeier Hansson; see NOTICE.
+# Why: rbw lock instead of 1password --lock. Pin entry: .chezmoidata/omarchy.toml
+
+# omarchy:summary=Lock the computer and turn off the display
+# omarchy:group=system
+# omarchy:name=lock
+# omarchy:examples=omarchy system lock
+
+omarchy-shell lock lock >/dev/null
+
+# Set keyboard layout to default (first layout)
+hyprctl switchxkblayout all 0 > /dev/null 2>&1
+
+# Ensure rbw vault is locked (Bitwarden GUI uses its own vault_timeout)
+if pgrep -x "rbw-agent" >/dev/null; then
+  rbw lock 2>/dev/null || true
+fi
+
+# Avoid running screensaver when locked
+pkill -x ttfx 2>/dev/null || true
+# ttfx handles SIGTERM asynchronously, so keep its terminal alive until it exits.
+timeout 1s pidwait -x ttfx 2>/dev/null || true
+pkill -f '[o]rg.omarchy.screensaver' 2>/dev/null || true

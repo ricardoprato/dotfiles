@@ -1,0 +1,11 @@
+[tools]
+node = "24"
+"npm:pnpm" = "latest"
+bun = "latest"
+deno = "latest"
+python = "3.14"
+rust = "latest"
+"npm:@colbymchenry/codegraph" = "latest"
+"pypi:whisper-ctranslate2" = "latest"
+dotnet = "10"
+claude = "latest"

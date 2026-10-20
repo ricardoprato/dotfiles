@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Print directories worth jumping to, one per line, for the folder pickers
+# (kitty-tab-picker on kitty's alt+d, the fish `tm` sesh picker on tmux's M-d).
+# Callers put their frecency source (zoxide / sesh) first and append this as
+# the filesystem fallback, so a directory shows up before it was ever cd'd into.
+#
+# ~/.local is excluded from the walk (too noisy), so the chezmoi source dir,
+# which lives under it, is listed explicitly.
+
+set -euo pipefail
+
+chezmoi_src="$HOME/.local/share/chezmoi"
+[ -d "$chezmoi_src" ] && printf '%s\n' "$chezmoi_src"
+
+fd --type d --hidden \
+   --exclude .git --exclude node_modules --exclude .cache \
+   --exclude .venv --exclude target --exclude .worktrees \
+   --exclude .local --exclude .var --exclude .mozilla \
+   --exclude .steam --exclude .wine --exclude .rustup --exclude .cargo \
+   --max-depth 4 \
+   . "$HOME" 2>/dev/null | sed 's:/$::'

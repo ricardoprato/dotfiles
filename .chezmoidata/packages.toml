@@ -1,0 +1,388 @@
+# Package sets per feature unit.
+#
+# Consumed by .chezmoiscripts/run_onchange_before_10-install-packages.sh.tmpl,
+# which concatenates the sets for the units enabled in the machine-local
+# manifest (~/.config/chezmoi/chezmoi.toml, [data.features]) plus the driver set
+# for data.gpu, then hands the result to pacman/yay with --needed.
+#
+# Platform split (data.platform): `base` and `work` are headless-safe and install
+# everywhere. `desktop` and `workDesktop` only install on native machines; on
+# "wsl" the installer also skips content, gaming and the GPU set. Every package
+# lives in exactly one set.
+#
+# SCOPE: userland only. The kernel, bootloader, microcode, initramfs hooks and
+# hardware-specific drivers (fingerprint, wifi dongles, headsets) are the
+# installer's job, not chezmoi's — installing them from here would push GRUB
+# onto a Limine machine or amd-ucode onto an Intel one. They are deliberately
+# absent from these lists.
+#
+# DISTRO: these names resolve against CachyOS repos. Most of what CachyOS ships
+# is a same-name rebuild of an Arch package, so the lists work on plain Arch
+# too — except for a handful CachyOS packages itself and Arch keeps in the AUR:
+# brave-bin, claude-code, claude-desktop, neovim-git, pokemon-colorscripts-git,
+# zen-browser-bin. On a non-CachyOS Arch box, move those to the `aur`
+# list of their unit.
+#
+# Regenerate a snapshot of a machine's current state with:
+#   pacman -Qqen   # native, explicitly installed
+#   pacman -Qqem   # AUR / foreign, explicitly installed
+
+# --------------------------------------------------------------------------
+# base — always installed, on every platform: shell, git, editors, everyday
+# CLI. Everything here must be useful headless (WSL2 gets exactly this).
+# --------------------------------------------------------------------------
+[packages.base]
+pacman = [
+  "7zip",
+  "atuin",
+  "base-devel",
+  "bat",
+  "btop",
+  "chezmoi",
+  "cpio",
+  "dosfstools",
+  "eza",
+  "fastfetch",
+  "fd",
+  "ffmpegthumbnailer",
+  "fish",
+  "fzf",
+  "git",
+  "gum",
+  "imagemagick",
+  "jq",
+  "man-db",
+  "man-pages",
+  "neovim-git",
+  "openssh",
+  "pacman-contrib",
+  "parallel",
+  "pokemon-colorscripts-git",
+  "rbw",
+  "reflector",
+  "ripgrep",
+  "rsync",
+  "socat",
+  "starship",
+  "stow",
+  "tmux",
+  "trash-cli",
+  "unrar",
+  "unzip",
+  "usage",
+  "wget",
+  "yazi",
+  "zip",
+  "zoxide",
+  "zsh",
+]
+aur = []
+
+# --------------------------------------------------------------------------
+# desktop — native machines only: Hyprland/Wayland session, GUI apps, fonts,
+# theming, audio, bluetooth, printing, browsers, input methods, display
+# manager and the desktop daemons. Skipped when data.platform = "wsl".
+# --------------------------------------------------------------------------
+[packages.desktop]
+pacman = [
+  "adobe-source-sans-fonts",
+  "adobe-source-serif-fonts",
+  "alsa-utils",
+  "anki",
+  "awww",
+  "bitwarden",
+  "bluetui",
+  "bluez",
+  "bluez-tools",
+  "bluez-utils",
+  "brave-bin",
+  "breeze",
+  "breeze-gtk",
+  "breezy",
+  "brightnessctl",
+  "cliphist",
+  "cups",
+  "ddcutil",
+  "discord",
+  "dmidecode",
+  "earlyoom",
+  "easyeffects",
+  "fcitx5",
+  "fcitx5-configtool",
+  "fcitx5-gtk",
+  "fcitx5-mozc",
+  "fcitx5-qt",
+  "ffmpeg",
+  "firefox",
+  "firewalld",
+  "flatpak",
+  "fwupd",
+  "ghostty",
+  "gnome-calculator",
+  "gnome-keyring",
+  "grim",
+  "gst-plugin-pipewire",
+  "gvfs",
+  "hyprland",
+  "hyprland-guiutils",
+  "hyprpaper",
+  "hyprpicker",
+  "hyprsunset",
+  "impala",
+  "imv",
+  "inotify-tools",
+  "inter-font",
+  "iptables",
+  "iw",
+  "kdeconnect",
+  "kitty",
+  "libpulse",
+  "libvips",
+  "mpv",
+  "mpv-mpris",
+  "nautilus",
+  "nautilus-python",
+  "networkmanager",
+  "nm-connection-editor",
+  "noto-fonts",
+  "noto-fonts-cjk",
+  "noto-fonts-emoji",
+  "noto-fonts-extra",
+  "ntfs-3g",
+  "nwg-look",
+  "obsidian",
+  "otf-font-awesome",
+  "pavucontrol",
+  "pipewire",
+  "pipewire-alsa",
+  "pipewire-jack",
+  "pipewire-pulse",
+  "power-profiles-daemon",
+  "python-pywayland",
+  "qrencode",
+  "qt5ct",
+  "qt6-base",
+  "qt6-declarative",
+  "qt6-imageformats",
+  "qt6-multimedia",
+  "qt6-svg",
+  "qt6-wayland",
+  "qt6ct",
+  "quickshell",
+  "satty",
+  "slurp",
+  "snixembed",
+  "spotify-launcher",
+  "spotify-player",
+  "swappy",
+  "swaybg",
+  "system-config-printer",
+  "systembus-notify",
+  "tela-circle-icon-theme-dracula",
+  "telegram-desktop",
+  "thunar",
+  "thunar-archive-plugin",
+  "thunar-volman",
+  "timeshift",
+  "ttf-dejavu",
+  "ttf-inconsolata",
+  "ttf-lato",
+  "ttf-linux-libertine",
+  "ttf-nerd-fonts-symbols-mono",
+  "tumbler",
+  "udiskie",
+  "udisks2",
+  "uwsm",
+  "wev",
+  "wiremix",
+  "wireplumber",
+  "wl-clipboard",
+  "wlogout",
+  "wtype",
+  "xdg-desktop-portal-hyprland",
+  "zbar",
+  "zen-browser-bin",
+  "zram-generator",
+]
+aur = [
+  "arc",
+  "bibata-cursor-theme",
+  "catppuccin-gtk-theme-mocha",
+  "catppuccin-sddm-theme-mocha",
+  "cliamp",
+  "google-chrome",
+  "hyprland-preview-share-picker-git",
+  "kvantum-theme-catppuccin-git",
+  "libastal-git",
+  "libastal-io-git",
+  "safeeyes",
+  "sddm-git",
+  "spotify",
+  "thunderbird-bin",
+  "ttf-joypixels",
+  "ttf-ms-fonts",
+  "ttfx",
+  "xdg-terminal-exec-git",
+  "xwaylandvideobridge-git",
+]
+
+# --------------------------------------------------------------------------
+# work — dev tooling that works headless: language runtimes, git helpers,
+# VPN clients, CLI editors/linters. Installed on every platform.
+# --------------------------------------------------------------------------
+[packages.work]
+pacman = [
+  "bats",
+  "claude-code",
+  "direnv",
+  "git-delta",
+  "git-filter-repo",
+  "github-cli",
+  "gitleaks",
+  "gnome-common",
+  "go",
+  "intltool",
+  "jre17-openjdk",
+  "lazydocker",
+  "lazygit",
+  "mise",
+  "mono",
+  "npm",
+  "openconnect",
+  "openfortivpn",
+  "openvpn",
+  "pnpm",
+  "pyenv",
+  "python-pysmbc",
+  "shellcheck",
+  "sshfs",
+  "sshpass",
+  "sshs",
+  "tree-sitter-cli",
+]
+aur = [
+  "gitflow-cjs",
+  "python-croniter",
+  "tree-sitter-lua-git",
+]
+
+# --------------------------------------------------------------------------
+# workDesktop — the half of the work unit that needs a native machine:
+# container engine and VM stack (WSL2 gets docker from Docker Desktop), GUI
+# apps. Installed with `work`, but only when data.platform is not "wsl".
+# --------------------------------------------------------------------------
+[packages.workDesktop]
+pacman = [
+  "claude-desktop",
+  "dnsmasq",
+  "docker",
+  "docker-compose",
+  "filezilla",
+  "libvirt",
+  "qemu-full",
+  "virt-manager",
+]
+aur = [
+  "anydesk-bin",
+  "postman-bin",
+  "visual-studio-code-bin",
+]
+
+# --------------------------------------------------------------------------
+# content — creative / media production: 3D, CAD, raster, vector, video,
+# audio plugins, OCR.
+# --------------------------------------------------------------------------
+[packages.content]
+pacman = [
+  "blender",
+  "calf",
+  "freecad",
+  "gimp",
+  "gpu-screen-recorder",
+  "inkscape",
+  "libreoffice-fresh",
+  "lsp-plugins-lv2",
+  "mda.lv2",
+  "obs-studio",
+  "tesseract",
+  "tesseract-data-eng",
+  "wf-recorder",
+  "zam-plugins-lv2",
+]
+aur = [
+  "typora",
+]
+
+# --------------------------------------------------------------------------
+# gaming — Steam/Proton, the gamescope+gamemode+MangoHud runtime, Wine, and
+# emulation. lib32-* here is why this unit needs [multilib]; the install
+# script enables that repo when the unit is on.
+# --------------------------------------------------------------------------
+[packages.gaming]
+pacman = [
+  "dolphin-emu",
+  # Local game streaming. moonlight-qt is the client; sunshine is the host and
+  # stays inert until you enable it (systemctl --user enable --now sunshine), so
+  # it is safe to ship on every gaming machine. Pair them and a weak laptop
+  # plays whatever the strong desktop can render, at LAN latency.
+  "moonlight-qt",
+  "sunshine",
+  "gamemode",
+  "gamescope",
+  "lib32-gamemode",
+  "lib32-mangohud",
+  "libretro-mgba",
+  "libretro-snes9x",
+  "mangohud",
+  "retroarch",
+  "retroarch-assets-xmb",
+  "steam",
+  "steam-devices",
+  "ttf-liberation",
+  "vulkan-tools",
+  "wine",
+  "wine-gecko",
+  "wine-mono",
+  "winetricks",
+]
+aur = [
+  "heroic-games-launcher-bin",
+  "protonup-qt",
+]
+
+# --------------------------------------------------------------------------
+# GPU driver sets, selected by data.gpu (autodetected from lspci at
+# `chezmoi init`, overridable in the machine-local manifest).
+#
+#   pacman   — always installed, the desktop needs them
+#   pacman32 — 32-bit userspace, only installed when the gaming unit is on
+#              (nothing else on this system needs multilib)
+# --------------------------------------------------------------------------
+[gpuPackages.amd]
+pacman = ["mesa", "vulkan-radeon", "vulkan-mesa-layers", "vulkan-tools"]
+pacman32 = ["lib32-mesa", "lib32-vulkan-radeon", "lib32-vulkan-mesa-layers"]
+aur = ["lact"]
+
+[gpuPackages.nvidia]
+pacman = [
+  "egl-wayland",
+  "libva-nvidia-driver",
+  "nvidia-open-dkms",
+  "nvidia-settings",
+  "nvidia-utils",
+  "vulkan-tools",
+]
+pacman32 = ["lib32-nvidia-utils"]
+aur = []
+
+[gpuPackages.intel]
+pacman = ["intel-media-driver", "mesa", "vulkan-intel", "vulkan-mesa-layers", "vulkan-tools"]
+pacman32 = ["lib32-mesa", "lib32-vulkan-intel"]
+aur = []
+
+# Fallback when lspci matched nothing recognisable (VMs, exotic hardware).
+# Software rendering plus the loader — enough to reach a desktop and fix it.
+[gpuPackages.unknown]
+pacman = ["mesa", "vulkan-mesa-layers", "vulkan-swrast", "vulkan-tools"]
+pacman32 = ["lib32-mesa", "lib32-vulkan-swrast"]
+aur = []

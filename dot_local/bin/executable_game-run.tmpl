@@ -1,0 +1,145 @@
+{{- $gpu := dig "gpu" "unknown" . -}}
+{{- $chassis := dig "chassis" "desktop" . -}}
+#!/usr/bin/env bash
+# Run a game under gamescope + gamemode with the MangoHud overlay attached.
+# Managed by chezmoi, gaming unit. Not an omarchy script.
+#
+# gamescope renders the game into its own nested compositor at a resolution
+# independent of the desktop, then upscales with FSR to fill the screen. On a
+# power-limited integrated GPU that is the single biggest lever available:
+# dropping render resolution ~33% roughly halves the pixel cost while FSR keeps
+# the result sharp, and the desktop never changes mode.
+#
+# Usage:
+#   game-run [options] -- <command> [args...]
+#
+# Steam launch options:
+#   game-run -- %command%
+
+set -euo pipefail
+
+# Render scale relative to the monitor's native resolution. A laptop defaults
+# to a reduced scale because its GPU is integrated and shares the CPU's power
+# budget; a desktop with a discrete card renders native until told otherwise.
+readonly DEFAULT_SCALE={{ if eq $chassis "laptop" }}0.67{{ else }}1.00{{ end }}
+readonly GPU={{ $gpu | quote }}
+
+die() { printf 'game-run: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+  cat <<'EOF'
+Usage: game-run [options] -- <command> [args...]
+
+Options:
+  -r WxH   explicit render resolution (overrides -s)
+  -s F     render scale factor, 0 < F <= 1 (default: 0.67 laptop, 1.00 desktop)
+  -l N     cap the framerate at N
+  -b       borderless window instead of fullscreen
+  -n       skip gamescope entirely; gamemode + MangoHud only
+  -h       show this help
+
+Notes:
+  -n exists because some launchers (Lutris, Heroic, anything that spawns its
+  own window manager) misbehave inside a nested compositor. Reach for it when a
+  game shows a black screen or loses its cursor under gamescope.
+
+  The MangoHud overlay starts hidden. Toggle it with Shift_R+F12.
+EOF
+  exit 0
+}
+
+render=""
+scale="$DEFAULT_SCALE"
+fps_cap=""
+window_mode="fullscreen"
+use_gamescope=1
+
+while (( $# )); do
+  case $1 in
+    -r) render=${2:?-r needs WxH}; shift 2 ;;
+    -s) scale=${2:?-s needs a factor}; shift 2 ;;
+    -l) fps_cap=${2:?-l needs a number}; shift 2 ;;
+    -b) window_mode="borderless"; shift ;;
+    -n) use_gamescope=0; shift ;;
+    -h|--help) usage ;;
+    --) shift; break ;;
+    -*) die "unknown option: $1" ;;
+    *)  die "unexpected argument '$1' — the command goes after --" ;;
+  esac
+done
+
+(( $# )) || die "no command given (see: game-run -h)"
+
+command -v gamemoderun >/dev/null 2>&1 \
+  || die "gamemoderun not found — apply the gaming unit first (chezmoi apply)"
+command -v mangohud >/dev/null 2>&1 \
+  || die "mangohud not found — apply the gaming unit first (chezmoi apply)"
+
+if (( use_gamescope )); then
+  command -v gamescope >/dev/null 2>&1 \
+    || die "gamescope not found — apply the gaming unit first, or pass -n"
+fi
+
+# Ask Hyprland for the focused monitor's mode. Everything downstream is
+# optional: if this fails, gamescope inherits whatever the compositor gives it.
+out_w=0
+out_h=0
+if command -v hyprctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  read -r out_w out_h < <(
+    hyprctl -j monitors 2>/dev/null \
+      | jq -r 'map(select(.focused)) | .[0] // empty | "\(.width) \(.height)"'
+  ) || true
+  [[ $out_w =~ ^[0-9]+$ ]] || out_w=0
+  [[ $out_h =~ ^[0-9]+$ ]] || out_h=0
+fi
+
+# Derive the render resolution from the scale when it was not given outright.
+# Rounded down to even numbers: odd dimensions upset some engines and encoders.
+if [[ -z $render && $out_w -gt 0 ]]; then
+  render=$(awk -v w="$out_w" -v h="$out_h" -v s="$scale" 'BEGIN {
+    if (s <= 0 || s > 1) { exit 1 }
+    printf "%dx%d", int(w * s / 2) * 2, int(h * s / 2) * 2
+  }') || die "invalid scale '$scale' (expected 0 < F <= 1)"
+fi
+
+if (( ! use_gamescope )); then
+  exec gamemoderun mangohud "$@"
+fi
+
+gamescope_args=(gamescope)
+
+if (( out_w > 0 )); then
+  gamescope_args+=(-W "$out_w" -H "$out_h")
+fi
+
+if [[ -n $render ]]; then
+  render_w=${render%x*}
+  render_h=${render#*x}
+  gamescope_args+=(-w "$render_w" -h "$render_h")
+
+  # Only ask for a scaling filter when there is actually something to upscale.
+  # FSR on a 1:1 render is wasted work and slightly softens the image.
+  if (( out_w > 0 && render_w < out_w )); then
+    gamescope_args+=(-F fsr --sharpness 2)
+  fi
+fi
+
+if [[ $window_mode == fullscreen ]]; then
+  gamescope_args+=(-f)
+else
+  gamescope_args+=(-b)
+fi
+
+if [[ -n $fps_cap ]]; then
+  gamescope_args+=(-r "$fps_cap")
+fi
+{{ if eq $gpu "nvidia" }}
+# NVIDIA's Wayland path still wants explicit VA-API steering for in-game video
+# and hardware decode; harmless when the game never decodes anything.
+export LIBVA_DRIVER_NAME=nvidia
+export NVD_BACKEND=direct
+{{- end }}
+printf 'game-run: %s render, %s output, gpu=%s\n' \
+  "${render:-native}" "$( (( out_w > 0 )) && echo "${out_w}x${out_h}" || echo unknown )" "$GPU" >&2
+
+exec "${gamescope_args[@]}" -- gamemoderun mangohud "$@"

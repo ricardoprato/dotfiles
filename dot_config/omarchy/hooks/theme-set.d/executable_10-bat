@@ -1,0 +1,5 @@
+#!/bin/bash
+# Re-render bat's config after a theme switch. bat has no include mechanism, so
+# chezmoi owns ~/.config/bat/config and renders --theme from
+# ~/.local/state/omarchy/current/theme.name (see dot_config/bat/config.tmpl).
+exec restart-bat

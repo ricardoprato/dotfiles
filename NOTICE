@@ -1,0 +1,44 @@
+NOTICE
+
+This repository is a personal chezmoi overlay on top of Omarchy
+(https://github.com/basecamp/omarchy). It is not Omarchy and is not affiliated
+with or endorsed by its authors.
+
+Original work
+-------------
+Everything in this repository that is not listed under "Omarchy-derived files"
+below is original work, Copyright (c) 2026 Ricardo Prato, under the MIT License
+(see LICENSE).
+
+Omarchy (fetched, not redistributed)
+------------------------------------
+Omarchy is Copyright (c) David Heinemeier Hansson and contributors, under the
+MIT License. Its code, themes and assets are NOT stored in this repository.
+chezmoi downloads them from github.com/basecamp/omarchy at the commit pinned in
+.chezmoidata/omarchy.toml (see .chezmoiexternal.toml.tmpl). They stay subject to
+Omarchy's own license.
+
+Omarchy-derived files
+---------------------
+The files below are whole-file replacements: modified copies of Omarchy files.
+They remain under Omarchy's MIT License and its copyright notice, a copy of
+which is kept in LICENSES/omarchy-MIT.txt. Each one carries a header naming its
+upstream file and commit. The authoritative list is [omarchy.overrides] in
+.chezmoidata/omarchy.toml:
+
+  dot_local/bin/executable_omarchy-launch-webapp
+  dot_local/bin/executable_omarchy-theme-set-browser
+  dot_local/bin/executable_omarchy-sudo-passwordless
+  dot_local/bin/executable_omarchy-restart-app
+  dot_local/bin/executable_omarchy-system-lock
+  dot_local/bin/executable_omarchy-powerprofiles-list
+  dot_local/bin/executable_omarchy-powerprofiles-set
+  dot_local/bin/executable_omarchy-theme-set-glass
+  dot_local/bin/executable_omarchy-menu-keybindings
+  dot_local/bin/executable_omarchy-windows-vm
+
+Other third-party material
+--------------------------
+Neovim configuration is a separate repository (ricardoprato/nvim) fetched as a
+chezmoi external. Everything else installed through packages.toml is provided by
+its own packages and licenses.

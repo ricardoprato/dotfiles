@@ -1,0 +1,270 @@
+#!/bin/bash
+#
+# shell-lock-setup-pam: install the PAM services the omarchy shell lock screen
+# authenticates against, exactly as upstream's omarchy-apply-lock ships them:
+#   /etc/pam.d/omarchy-lock-password     always (the lock refuses to engage
+#                                        with "missing-pam" until it exists)
+#   /etc/pam.d/omarchy-lock-fingerprint  only when the user has fingers
+#                                        enrolled, together with fprintd's
+#                                        resume hook and stop-timeout drop-in;
+#                                        removed again when none are enrolled
+# No FIDO2 service exists for the lock upstream, so none is installed. Files
+# that would be overwritten or removed are backed up first. Run by hand (needs
+# sudo); idempotent: a file already identical is left alone.
+#
+# Usage: shell-lock-setup-pam [--dry-run]
+
+set -eEuo pipefail
+
+PAM_DIR=/etc/pam.d
+PASSWORD_PAM=$PAM_DIR/omarchy-lock-password
+FINGERPRINT_PAM=$PAM_DIR/omarchy-lock-fingerprint
+RESUME_HOOK=/usr/lib/systemd/system-sleep/fprintd-resume
+STOP_TIMEOUT=/etc/systemd/system/fprintd.service.d/10-stop-timeout.conf
+DRY_RUN=0
+BACKUP_DIR=""
+TMP_DIR=""
+RELOAD=0
+
+log() { printf '==> %s\n' "$*"; }
+warn() { printf 'warning: %s\n' "$*" >&2; }
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+plan() { printf '[dry-run] would %s\n' "$*"; }
+
+usage() {
+  echo "Usage: ${0##*/} [--dry-run]"
+}
+
+case "${1:-}" in
+  "") ;;
+  --dry-run) DRY_RUN=1 ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
+as_root() {
+  if ((EUID == 0)); then "$@"; else sudo "$@"; fi
+}
+
+# shellcheck disable=SC2329  # runs from the EXIT trap
+cleanup() {
+  [[ -n $TMP_DIR ]] && rm -rf "$TMP_DIR"
+  return 0
+}
+trap cleanup EXIT
+
+# --- preconditions -----------------------------------------------------------
+
+if [[ -r /proc/sys/kernel/osrelease ]] && grep -qi microsoft /proc/sys/kernel/osrelease; then
+  die "WSL detected: there is no desktop shell lock here. Nothing to do."
+fi
+
+target_user=${SUDO_USER:-${USER:-$(id -un)}}
+
+check_pam_module() {
+  local module=$1
+  if [[ -e /usr/lib/security/$module || -e /lib/security/$module ]]; then
+    return 0
+  fi
+  local msg="PAM module $module not found (package pam)."
+  if ((DRY_RUN)); then
+    warn "$msg continuing because of --dry-run."
+  else
+    die "$msg Aborting before touching anything."
+  fi
+}
+check_pam_module pam_faillock.so
+check_pam_module pam_unix.so
+
+if [[ ! -e $PAM_DIR/system-local-login ]]; then
+  msg="$PAM_DIR/system-local-login not found; the lock services include it for the account stage."
+  if ((DRY_RUN)); then
+    warn "$msg continuing because of --dry-run."
+  else
+    die "$msg Aborting before touching anything."
+  fi
+fi
+
+# --- desired content (verbatim from upstream omarchy-apply-lock) -------------
+
+TMP_DIR=$(mktemp -d)
+chmod 700 "$TMP_DIR"
+
+cat >"$TMP_DIR/password" <<'EOF'
+#%PAM-1.0
+auth       required                    pam_faillock.so preauth silent deny=10 unlock_time=120
+-auth      [success=2 default=ignore]  pam_systemd_home.so
+auth       [success=1 default=bad]     pam_unix.so try_first_pass nullok
+auth       [default=die]               pam_faillock.so authfail deny=10 unlock_time=120
+auth       optional                    pam_permit.so
+auth       required                    pam_env.so
+auth       required                    pam_faillock.so authsucc
+account    include                     system-local-login
+EOF
+
+cat >"$TMP_DIR/fingerprint" <<'EOF'
+#%PAM-1.0
+auth       required                    pam_fprintd.so
+account    include                     system-local-login
+EOF
+
+# Suspend can wedge fprintd's claim; restart it after resume to clear it.
+# Upstream: https://gitlab.freedesktop.org/libfprint/fprintd/-/issues/173
+cat >"$TMP_DIR/resume-hook" <<'EOF'
+#!/bin/bash
+
+# Suspend can wedge fprintd's claim; restart it after resume to clear it.
+# Upstream: https://gitlab.freedesktop.org/libfprint/fprintd/-/issues/173
+
+if [[ $1 == "post" ]]; then
+  # user.slice stays frozen until this hook returns; enqueue rather than wait.
+  systemctl --no-block try-restart fprintd.service 2>/dev/null || true
+fi
+EOF
+
+cat >"$TMP_DIR/stop-timeout" <<'EOF'
+# A stale device handle can make fprintd ignore SIGTERM after resume.
+# The numeric prefix lets an administrator's override.conf take precedence.
+[Service]
+TimeoutStopSec=3s
+EOF
+
+# --- fingerprint enrollment (read-only probe, as upstream) -------------------
+
+# A failed probe is not "no fingers": keep whatever is configured then.
+if [[ -x /usr/bin/fprintd-list ]]; then
+  fingerprint_status=$(/usr/bin/fprintd-list "$target_user" 2>&1 || true)
+else
+  fingerprint_status=no
+fi
+
+if grep -qE '^[[:space:]]*-[[:space:]]*#[0-9]+:' <<<"$fingerprint_status"; then
+  fingerprint=enrolled
+elif [[ $fingerprint_status == no ]] || grep -qi 'has no fingers enrolled' <<<"$fingerprint_status"; then
+  fingerprint=none
+else
+  fingerprint=unknown
+fi
+
+# --- helpers -----------------------------------------------------------------
+
+# state_of <dest> <staged>: new | changed | same
+state_of() {
+  if [[ ! -e $1 ]]; then
+    echo new
+  elif cmp -s "$1" "$2"; then
+    echo same
+  else
+    echo changed
+  fi
+}
+
+backup() {
+  local file=$1
+  [[ -e $file ]] || return 0
+  if [[ -z $BACKUP_DIR ]]; then
+    BACKUP_DIR=/var/backups/shell-lock-pam-$(date +%Y%m%d-%H%M%S)
+    as_root install -d -m 0700 -o root -g root "$BACKUP_DIR"
+    log "backing up replaced files to $BACKUP_DIR"
+  fi
+  as_root cp -a --parents "$file" "$BACKUP_DIR"
+}
+
+# install_file <mode> <staged> <dest>
+install_file() {
+  local mode=$1 staged=$2 dest=$3 state
+  state=$(state_of "$dest" "$staged")
+  if [[ $state == same ]]; then
+    echo "unchanged: $dest"
+    return 0
+  fi
+  if ((DRY_RUN)); then
+    if [[ $state == changed ]]; then
+      plan "back up $dest, then install it (mode $mode, root:root; $state)"
+    else
+      plan "install $dest (mode $mode, root:root; $state)"
+    fi
+    return 0
+  fi
+  [[ $state == changed ]] && backup "$dest"
+  as_root install -Dm"$mode" -o root -g root "$staged" "$dest"
+  echo "installed: $dest ($state)"
+  [[ $dest == "$STOP_TIMEOUT" ]] && RELOAD=1
+  return 0
+}
+
+remove_file() {
+  local dest=$1
+  [[ -e $dest ]] || return 0
+  if ((DRY_RUN)); then
+    plan "remove $dest (backing it up first)"
+    return 0
+  fi
+  backup "$dest"
+  as_root rm -f "$dest"
+  echo "removed: $dest"
+  [[ $dest == "$STOP_TIMEOUT" ]] && RELOAD=1
+  return 0
+}
+
+# --- plan / dry run header ---------------------------------------------------
+
+if ((DRY_RUN)); then
+  log "dry-run: nothing is changed and no sudo is used (fingerprint probe for '$target_user': $fingerprint)"
+  plan "ask for sudo credentials once (sudo -v)"
+  plan "back up every file that gets replaced or removed to /var/backups/shell-lock-pam-<timestamp>/ (root:root 0700)"
+else
+  log "requesting sudo credentials"
+  if ((EUID != 0)); then sudo -v; fi
+fi
+
+# --- apply -------------------------------------------------------------------
+
+log "lock screen password authentication"
+install_file 644 "$TMP_DIR/password" "$PASSWORD_PAM"
+
+case $fingerprint in
+  enrolled)
+    log "lock screen fingerprint authentication (fingers enrolled for $target_user)"
+    install_file 755 "$TMP_DIR/resume-hook" "$RESUME_HOOK"
+    install_file 644 "$TMP_DIR/stop-timeout" "$STOP_TIMEOUT"
+    install_file 644 "$TMP_DIR/fingerprint" "$FINGERPRINT_PAM"
+    ;;
+  none)
+    log "no fingers enrolled for $target_user: fingerprint service not wanted"
+    remove_file "$FINGERPRINT_PAM"
+    remove_file "$RESUME_HOOK"
+    remove_file "$STOP_TIMEOUT"
+    ;;
+  *)
+    warn "could not check fingerprint enrollment; keeping the existing fingerprint configuration."
+    ;;
+esac
+
+if ((DRY_RUN)); then
+  plan "run 'systemctl daemon-reload' if the fprintd stop-timeout drop-in was added, changed or removed"
+  plan "check that $PASSWORD_PAM exists and is readable (what the shell's 'missing-pam' check looks for)"
+  exit 0
+fi
+
+if ((RELOAD)); then
+  as_root systemctl daemon-reload
+  rmdir --ignore-fail-on-non-empty "${STOP_TIMEOUT%/*}" 2>/dev/null || as_root rmdir --ignore-fail-on-non-empty "${STOP_TIMEOUT%/*}" 2>/dev/null || true
+fi
+
+[[ -r $PASSWORD_PAM ]] || die "$PASSWORD_PAM is missing or unreadable after install."
+cmp -s "$PASSWORD_PAM" "$TMP_DIR/password" || die "$PASSWORD_PAM does not match what was installed."
+
+log "done. The shell lock no longer reports missing-pam."
+[[ -n $BACKUP_DIR ]] && echo "backup: $BACKUP_DIR"
+echo "Verify with: omarchy-shell lock status (once the shell is running)"
+exit 0
