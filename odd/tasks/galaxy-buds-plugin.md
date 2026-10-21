@@ -73,6 +73,13 @@ controls in the Omarchy bar, like the AirPods plugins in the catalog.
   package kept). T1-T3 commits squashed into one (drops committed `__pycache__`).
   Live check pending: buds were not connected to the PC (`device_not_found`;
   `bluetoothctl connect` failed with `le-connection-abort-by-local`).
+- 2026-10-21: live use by user works. Fixes: bar button is icon-only (label
+  overlapped the icon in the fixed slot; battery stays in tooltip/popup);
+  seamless hint now says what the switch does. Widget moved between
+  `omarchy.keyboard-layout` and `omarchy.agents`. Decision: keep a separate
+  widget, no clone of `omarchy.bluetooth` for now (avoids a frozen 1050-line fork).
+- Open: Adaptive mode turns off when the buds are taken out. Unknown whether
+  buds firmware or our decoding; waiting on user check with Galaxy Wearable.
 
 ## Next step
 T4: enable in bar, restart shell. Live check blocked until `galaxybudsclient` (pid holding the SPP UUID) is quit: `buds status` returned `profile_busy`.
