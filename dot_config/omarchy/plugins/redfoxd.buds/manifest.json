@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "redfoxd.buds",
+  "name": "Galaxy Buds",
+  "version": "0.1.0",
+  "author": "redfoxd",
+  "license": "MIT",
+  "description": "Samsung Galaxy Buds battery and controls in the Omarchy bar: noise control, ANC level, conversation detection, seamless connection, touch lock and find my buds.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Galaxy Buds",
+    "description": "Battery and controls for Samsung Galaxy Buds over Bluetooth.",
+    "category": "Audio",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "address": "",
+      "hideWhenDisconnected": false
+    },
+    "schema": [
+      {
+        "key": "address",
+        "type": "string",
+        "label": "Bluetooth address",
+        "defaultValue": "",
+        "description": "MAC address of the buds. Leave empty to use the first connected device whose name contains Buds."
+      },
+      {
+        "key": "hideWhenDisconnected",
+        "type": "boolean",
+        "label": "Hide when disconnected",
+        "defaultValue": false
+      }
+    ]
+  }
+}
