@@ -19,8 +19,8 @@
 # DISTRO: these names resolve against CachyOS repos. Most of what CachyOS ships
 # is a same-name rebuild of an Arch package, so the lists work on plain Arch
 # too — except for a handful CachyOS packages itself and Arch keeps in the AUR:
-# brave-bin, claude-code, claude-desktop, neovim-git, pokemon-colorscripts-git,
-# zen-browser-bin. On a non-CachyOS Arch box, move those to the `aur`
+# brave-bin, claude-code, claude-desktop, localsend (AUR: localsend-bin),
+# neovim-git, pokemon-colorscripts-git, zen-browser-bin. On a non-CachyOS Arch box, move those to the `aur`
 # list of their unit.
 #
 # Regenerate a snapshot of a machine's current state with:
@@ -138,6 +138,7 @@ pacman = [
   "kitty",
   "libpulse",
   "libvips",
+  "localsend",
   "mpv",
   "mpv-mpris",
   "nautilus",
