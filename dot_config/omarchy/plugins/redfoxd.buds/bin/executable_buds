@@ -1,0 +1,477 @@
+#!/usr/bin/python3
+# Read and control Samsung Galaxy Buds over their Bluetooth SPP channel.
+#
+# `watch` prints one compact JSON line per state change and reads `key value`
+# commands on stdin (`mode anc`, `seamless off`, ...). The Buds accept a single
+# SPP client, so the first copy binds an abstract unix socket and owns the
+# link; every other copy (one per monitor) mirrors the owner's lines and
+# forwards its commands to it.
+#
+# The link follows what GalaxyBudsClient does on Linux: register a BlueZ
+# Profile1 client for the SPP UUID, call Device1.ConnectProfile and take the
+# socket fd BlueZ hands to NewConnection. The wire protocol lives in
+# buds_protocol.py. Needs python3 with gi (Gio); no other dependencies.
+#
+# Usage:
+#   buds watch [--address MAC]    JSON lines, stdin commands
+#   buds status [--address MAC]   print the first full state and exit
+import argparse
+import json
+import os
+import re
+import select
+import signal
+import socket
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+
+import gi  # noqa: E402
+
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib  # noqa: E402
+
+import buds_protocol as proto  # noqa: E402
+import buds_state as st  # noqa: E402
+
+SPP_UUID = "2e73a4ad-332d-41fc-90e2-16bef06523f2"
+BLUEZ = "org.bluez"
+PROFILE_PATH = "/org/omarchy/buds/profile"
+LOCK = "\0omarchy-buds"
+CONNECT_TIMEOUT = 20
+MAC_RE = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
+PROFILE_XML = """
+<node>
+  <interface name="org.bluez.Profile1">
+    <method name="Release"/>
+    <method name="NewConnection">
+      <arg type="o" direction="in"/><arg type="h" direction="in"/>
+      <arg type="a{sv}" direction="in"/>
+    </method>
+    <method name="RequestDisconnection"><arg type="o" direction="in"/></method>
+  </interface>
+</node>"""
+
+
+class Link:
+    """One BlueZ SPP link at a time, with reconnect/backoff. Reports through callbacks."""
+
+    def __init__(self, address, on_line):
+        self.address = address
+        self.on_line = on_line
+        self.bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+        iface = Gio.DBusNodeInfo.new_for_xml(PROFILE_XML).interfaces[0]
+        self.bus.register_object(PROFILE_PATH, iface, self._on_profile_call, None, None)
+        self.sock = None
+        self.watch = None
+        self.state = None
+        self.rx = b""
+        self.attempt = 0
+        self.token = 0       # bumped per connect cycle; stale callbacks compare against it
+        self.timeout = None
+        self.fallback = None
+        self.retry = None
+        self.sent_manager_info = False
+
+    # -- cycle control ------------------------------------------------------
+    def start(self):
+        self.on_line({"connected": False})
+        GLib.idle_add(self._cycle)
+
+    def _fail(self, code):
+        self.token += 1
+        self._drop_link()
+        self._clear("timeout")
+        self.on_line({"connected": False, "error": code})
+        delay = st.backoff(self.attempt)
+        self.attempt += 1
+        self.retry = GLib.timeout_add_seconds(delay, self._cycle)
+
+    def _clear(self, name):
+        source = getattr(self, name)
+        if source:
+            GLib.source_remove(source)
+            setattr(self, name, None)
+
+    def _cycle(self):
+        self.retry = None
+        self.token += 1
+        token = self.token
+        try:
+            device = self._find_device()
+        except GLib.Error:
+            self._fail("bluez_unavailable")
+            return False
+        if device is None:
+            self._fail("device_not_found")
+            return False
+        path, name, address, connected = device
+        self.device = (path, name, address)
+        if connected:
+            self._connect_profile(token)
+        else:
+            self.bus.call(BLUEZ, path, "org.bluez.Device1", "Connect", None, None,
+                          Gio.DBusCallFlags.NONE, CONNECT_TIMEOUT * 1000, None,
+                          self._on_connect_done, token)
+        return False
+
+    def _on_connect_done(self, bus, result, token):
+        if token != self.token:
+            return
+        try:
+            bus.call_finish(result)
+        except GLib.Error:
+            self._fail("connect_failed")
+            return
+        self._connect_profile(token)
+
+    def _find_device(self):
+        reply = self.bus.call_sync(
+            BLUEZ, "/", "org.freedesktop.DBus.ObjectManager", "GetManagedObjects", None,
+            GLib.VariantType("(a{oa{sa{sv}}})"), Gio.DBusCallFlags.NONE, 5000, None)
+        for path, ifaces in sorted(reply.unpack()[0].items()):
+            dev = ifaces.get("org.bluez.Device1")
+            if not dev:
+                continue
+            name = dev.get("Name") or dev.get("Alias") or ""
+            addr = dev.get("Address", "")
+            if self.address:
+                if addr.upper() != self.address.upper():
+                    continue
+            elif not (dev.get("Connected") and "buds" in name.lower()):
+                continue
+            return path, name, addr, bool(dev.get("Connected"))
+        return None
+
+    def _connect_profile(self, token):
+        options = {"Role": GLib.Variant("s", "client"), "Name": GLib.Variant("s", "omarchy-buds")}
+        try:
+            try:  # drop a stale registration of ours
+                self.bus.call_sync(BLUEZ, "/org/bluez", "org.bluez.ProfileManager1",
+                                   "UnregisterProfile", GLib.Variant("(o)", (PROFILE_PATH,)),
+                                   None, Gio.DBusCallFlags.NONE, 2000, None)
+            except GLib.Error:
+                pass
+            self.bus.call_sync(BLUEZ, "/org/bluez", "org.bluez.ProfileManager1",
+                               "RegisterProfile",
+                               GLib.Variant("(osa{sv})", (PROFILE_PATH, SPP_UUID, options)),
+                               None, Gio.DBusCallFlags.NONE, 5000, None)
+        except GLib.Error:
+            self._fail("profile_busy")
+            return
+        self.timeout = GLib.timeout_add_seconds(CONNECT_TIMEOUT, self._on_timeout, token)
+        self.bus.call(BLUEZ, self.device[0], "org.bluez.Device1", "ConnectProfile",
+                      GLib.Variant("(s)", (SPP_UUID,)), None, Gio.DBusCallFlags.NONE,
+                      CONNECT_TIMEOUT * 1000, None, self._on_profile_done, token)
+
+    def _on_timeout(self, token):
+        self.timeout = None
+        if token == self.token and self.sock is None:
+            self._fail("timeout")
+        return False
+
+    def _on_profile_done(self, bus, result, token):
+        if token != self.token:
+            return
+        try:
+            bus.call_finish(result)
+        except GLib.Error:
+            if self.sock is None:
+                self._fail("profile_connect_failed")
+
+    # -- Profile1 object ----------------------------------------------------
+    def _on_profile_call(self, conn, sender, path, iface, method, params, invocation):
+        if method == "NewConnection":
+            fd_list = invocation.get_message().get_unix_fd_list()
+            index = params.unpack()[1]
+            fd = fd_list.get(index) if fd_list else -1
+            invocation.return_value(None)
+            if fd >= 0:
+                self._on_connection(fd)
+        else:  # Release / RequestDisconnection
+            invocation.return_value(None)
+
+    def _on_connection(self, fd):
+        sock = socket.socket(fileno=fd)
+        if self.sock is not None or self.timeout is None:  # unexpected or late: not ours
+            sock.close()
+            return
+        self._clear("timeout")
+        sock.setblocking(False)
+        self.sock = sock
+        self.rx = b""
+        self.attempt = 0
+        self.sent_manager_info = False
+        path, name, address = self.device
+        self.state = st.fresh_state(address, name)
+        self.watch = GLib.io_add_watch(
+            sock.fileno(), GLib.PRIORITY_DEFAULT,
+            GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR, self._on_readable)
+        # The buds announce their state after the manager handshake; do not
+        # rely on them speaking first.
+        self.fallback = GLib.timeout_add_seconds(3, self._manager_info_once)
+        self.on_line(self.state)
+
+    # -- link I/O -----------------------------------------------------------
+    def _on_readable(self, fd, condition):
+        try:
+            data = self.sock.recv(4096)
+        except BlockingIOError:
+            return True
+        except OSError:
+            data = b""
+        if not data:
+            self.watch = None
+            self._fail("link_lost")
+            return False
+        frames, self.rx = proto.split_frames(self.rx + data)
+        changed = False
+        for msg_id, payload in frames:
+            if proto.is_extended_status(msg_id):
+                self._manager_info_once()
+            changed |= st.merge(self.state, proto.decode_message(msg_id, payload))
+        if changed:
+            self.on_line(self.state)
+        return True
+
+    def _manager_info_once(self):
+        self._clear("fallback")
+        if not self.sent_manager_info:
+            self.sent_manager_info = True
+            self.send(*proto.build_command("manager_info"))
+        return False
+
+    def send(self, msg_id, payload):
+        if self.sock is None:
+            return
+        try:
+            self.sock.send(proto.encode(msg_id, payload))
+        except BlockingIOError:
+            pass
+        except OSError:
+            self._fail("link_lost")
+
+    def command(self, line):
+        try:
+            msg = proto.build_command(line)
+        except ValueError as err:
+            print(f"buds: ignored command: {err}", file=sys.stderr)
+            return
+        self.send(*msg)
+
+    def _drop_link(self):
+        self._clear("fallback")
+        if self.watch:
+            GLib.source_remove(self.watch)
+            self.watch = None
+        if self.sock:
+            self.sock.close()
+            self.sock = None
+        self.state = None
+
+    def close(self):
+        self._drop_link()
+        try:
+            self.bus.call_sync(BLUEZ, "/org/bluez", "org.bluez.ProfileManager1",
+                               "UnregisterProfile", GLib.Variant("(o)", (PROFILE_PATH,)),
+                               None, Gio.DBusCallFlags.NONE, 1000, None)
+        except GLib.Error:
+            pass
+
+
+class App:
+    """Owner or mirror, depending on who binds the abstract socket first."""
+
+    def __init__(self, address):
+        self.address = address
+        self.loop = GLib.MainLoop()
+        self.last = ""
+        self.clients = []   # [(socket, LineBuffer)]
+        self.link = None
+        self.server = None
+        self.mirror_sock = None
+        self.mirror_watch = None
+        self.stdin_lines = st.LineBuffer()
+
+    def run(self):
+        GLib.io_add_watch(0, GLib.PRIORITY_DEFAULT, GLib.IO_IN | GLib.IO_HUP, self._on_stdin)
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, self._quit)
+        GLib.idle_add(self._choose_role)
+        self.loop.run()
+        if self.link:
+            self.link.close()
+
+    def _quit(self):
+        self.loop.quit()
+        return False
+
+    def _on_stdin(self, fd, condition):
+        data = os.read(0, 4096)
+        if not data:
+            self.loop.quit()
+            return False
+        if self.mirror_sock:
+            try:
+                self.mirror_sock.sendall(data)
+            except OSError:
+                pass
+        elif self.link:
+            for line in self.stdin_lines.feed(data):
+                self.link.command(line)
+        return True
+
+    # -- roles --------------------------------------------------------------
+    def _choose_role(self):
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            server.bind(LOCK)
+            server.listen()
+        except OSError:
+            server.close()
+            self._become_mirror()
+            return False
+        self.server = server
+        GLib.io_add_watch(server.fileno(), GLib.PRIORITY_DEFAULT, GLib.IO_IN, self._on_accept)
+        self.link = Link(self.address, self._emit_state)
+        self.link.start()
+        return False
+
+    def _emit_state(self, state):
+        line = st.dumps(state)
+        if line == self.last:
+            return
+        self.last = line
+        sys.stdout.write(line + "\n")
+        sys.stdout.flush()
+        for entry in list(self.clients):
+            try:
+                entry[0].send((line + "\n").encode(), socket.MSG_DONTWAIT)
+            except OSError:
+                self._drop_client(entry)
+
+    def _on_accept(self, fd, condition):
+        client = self.server.accept()[0]
+        entry = (client, st.LineBuffer())
+        self.clients.append(entry)
+        if self.last:  # a mirror joining between changes would stay blank
+            try:
+                client.send((self.last + "\n").encode(), socket.MSG_DONTWAIT)
+            except OSError:
+                pass
+        GLib.io_add_watch(client.fileno(), GLib.PRIORITY_DEFAULT,
+                          GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR, self._on_client, entry)
+        return True
+
+    def _on_client(self, fd, condition, entry):
+        try:
+            data = entry[0].recv(4096)
+        except OSError:
+            data = b""
+        if not data:
+            self._drop_client(entry)
+            return False
+        for line in entry[1].feed(data):
+            self.link.command(line)
+        return True
+
+    def _drop_client(self, entry):
+        if entry in self.clients:
+            self.clients.remove(entry)
+            entry[0].close()
+
+    def _become_mirror(self):
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            sock.connect(LOCK)
+        except OSError:  # the owner left between the failed bind and this connect
+            sock.close()
+            GLib.timeout_add(500, self._choose_role)
+            return
+        self.mirror_sock = sock
+        self.mirror_watch = GLib.io_add_watch(
+            sock.fileno(), GLib.PRIORITY_DEFAULT, GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR,
+            self._on_mirror_data)
+
+    def _on_mirror_data(self, fd, condition):
+        try:
+            data = self.mirror_sock.recv(4096)
+        except OSError:
+            data = b""
+        if not data:  # the owner went away: try to become it
+            self.mirror_sock.close()
+            self.mirror_sock = None
+            GLib.timeout_add(500, self._choose_role)
+            return False
+        os.write(1, data)
+        return True
+
+
+def status(address):
+    """Print the first full state (one-shot) and exit 0; exit 1 on timeout."""
+    deadline = 15
+
+    def done(line):
+        try:
+            data = json.loads(line)
+        except ValueError:
+            return False
+        return data.get("connected") is True and "noise_mode" in data
+
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.connect(LOCK)
+    except OSError:
+        sock.close()
+        sock = None
+    if sock:  # a running watcher owns the link: read its state instead
+        buf = st.LineBuffer()
+        sock.settimeout(deadline)
+        try:
+            while True:
+                data = sock.recv(4096)
+                if not data:
+                    break
+                for line in buf.feed(data):
+                    if done(line):
+                        print(line)
+                        return 0
+        except OSError:
+            pass
+        print(st.dumps({"connected": False, "error": "timeout"}))
+        return 1
+
+    result = {"line": None, "ok": False}
+    loop = GLib.MainLoop()
+
+    def on_line(state):
+        result["line"] = st.dumps(state)
+        if done(result["line"]):
+            result["ok"] = True
+            loop.quit()
+
+    link = Link(address, on_line)
+    link.start()
+    GLib.timeout_add_seconds(deadline, loop.quit)
+    loop.run()
+    link.close()
+    print(result["line"] or st.dumps({"connected": False, "error": "timeout"}))
+    return 0 if result["ok"] else 1
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="buds", description="Samsung Galaxy Buds control")
+    sub = parser.add_subparsers(dest="command", required=True)
+    for name in ("watch", "status"):
+        p = sub.add_parser(name)
+        p.add_argument("--address", default="", help="device MAC (default: first connected Buds)")
+    args = parser.parse_args()
+    if args.address and not MAC_RE.match(args.address):
+        parser.error("invalid --address")
+    if args.command == "status":
+        sys.exit(status(args.address))
+    App(args.address).run()
+
+
+if __name__ == "__main__":
+    main()
