@@ -26,7 +26,7 @@
   "buds.controls": "Controls",
   "buds.conversations": "Detect conversations",
   "buds.seamless": "Seamless connection",
-  "buds.seamless.hint": "Samsung Auto Switch with your account is not available on Linux.",
+  "buds.seamless.hint": "Off: your other Samsung devices will not take the buds from this PC. This PC never takes them back by itself.",
   "buds.touchLock": "Lock touch controls",
   "buds.find": "Find my buds",
   "buds.find.start": "Start ringing",

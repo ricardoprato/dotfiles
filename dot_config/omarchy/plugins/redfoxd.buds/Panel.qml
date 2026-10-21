@@ -145,7 +145,6 @@ Panel {
     anchors.fill: parent
     bar: root.bar
     text: "󰋋"
-    labelText: root.connected ? Model.batteryText(root.lowest) : ""
     tooltipText: root.tooltipText()
     dimmed: !root.connected
     useActiveColor: false
