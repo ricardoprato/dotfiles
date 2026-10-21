@@ -17,6 +17,9 @@
 #                                        upstream hash for it (<path> is the key
 #                                        in the pin file, e.g. bin/omarchy-x, or
 #                                        a bare bin name).
+#   upstream-sync --audit-deps           offline audit of the applied tree: the
+#                                        external commands its bins and shell
+#                                        scripts use that are not on PATH.
 #
 # --dry-run only reads (network + a history cache clone); nothing in the repo,
 # in $HOME or in the session changes. Test knobs (env): UPSTREAM_SYNC_URL,
@@ -54,11 +57,14 @@ usage() {
   cat <<'EOF'
 Usage: upstream-sync [--dry-run] [<ref>]
        upstream-sync --accept-override <path>
+       upstream-sync --audit-deps
 
   <ref>               sha, tag or branch of basecamp/omarchy (default: HEAD)
   --dry-run           report only; change nothing
   --accept-override   record the applied upstream hash for an override after
                       porting its upstream change by hand
+  --audit-deps        scan the applied upstream tree and list the external
+                      commands it uses that this machine lacks (offline)
 EOF
 }
 
@@ -193,6 +199,209 @@ blob_sha256() {
 bin_summary() {
   G cat-file blob "$1:$2" 2>/dev/null |
     awk -F'omarchy:summary=' '/omarchy:summary=/ && !s { s = $2 } END { print s }'
+}
+
+# ------------------------------------------------------ external commands ---
+# Upstream installs some tools from its own package repo, which this fork never
+# uses; a script that starts depending on one fails silently here. The
+# extractor below is a heuristic, deliberately over-inclusive on commands that
+# every machine has (grep, sed, ...) and conservative on prose: quoted strings,
+# heredocs, comments, variables, omarchy-* commands and functions defined in the
+# same file or assigned as variables are dropped; builtins and shell keywords
+# too, and so is anything shorter than 3 characters or all caps (noise).
+
+# <label>: script text on stdin; prints "<cmd>\t<guarded 0|1>" per external
+# command. guarded = the same file probes for it (command -v, omarchy-cmd-*,
+# which, hash, type), i.e. an optional feature rather than a hard dependency.
+# A *.qml label is scanned for command: ["x", ...] / execDetached(["x", ...]).
+ext_cmds() {
+  awk -v label="$1" '
+    function isword(w) { return length(w) >= 3 && w ~ /^[A-Za-z][A-Za-z0-9.+-]*$/ && w !~ /^[A-Z0-9.+-]+$/ && w !~ /^.\+\+$/ }
+    function emit(w, g) {
+      if (!isword(w) || (w in skip) || (w in fn) || w ~ /^omarchy-/) return
+      seen[w] = 1
+      if (g) gd[w] = 1
+    }
+    function proc(s,   t, n, i, w) {
+      n = split(s, t, /[ \t]+/)
+      for (i = 1; i <= n; i++) {
+        w = t[i]
+        if (w == "") continue
+        if (w ~ /^[0-9]*[<>]+$/) { i++; continue }
+        if (w ~ /^[0-9]*[<>&]/) continue
+        if (w ~ /^[A-Za-z_][A-Za-z0-9_]*\+?=/) continue
+        if (w == "for" || w == "case" || w == "select" || w == "function") return
+        if (w in kw) continue
+        if (w == "command") {
+          if (t[i + 1] ~ /^-[vV]$/) { emit(t[i + 2], 1); return }
+          continue
+        }
+        if (w == "uwsm" && t[i + 1] == "app") { i++; continue }
+        if (w in wrap) {
+          while (t[i + 1] ~ /^-/ || (w ~ /^(timeout|nice|ionice)$/ && t[i + 1] ~ /^[0-9.]+[smhd]?$/)) {
+            if (w == "sudo" && t[i + 1] ~ /^-[uUgGhpr]$/) i++
+            i++
+          }
+          continue
+        }
+        if (w ~ /^(omarchy-cmd-present|omarchy-cmd-missing|which|hash|type)$/) {
+          for (i++; i <= n; i++) if (t[i] !~ /^-/) emit(t[i], 1)
+          return
+        }
+        emit(w, 0)
+        return
+      }
+    }
+    BEGIN {
+      sq = "\047"
+      split(". : [ [[ alias bg bind break builtin caller cd compgen complete compopt continue declare dirs disown echo enable eval exit export false fc fg getopts help history jobs kill let local logout mapfile popd printf pushd pwd read readarray readonly return set shift shopt source suspend test times trap true typeset ulimit umask unalias unset wait if then else elif fi while until do done in esac time ! { }", a, " ")
+      for (i in a) skip[a[i]] = 1
+      split("if then else elif fi while until do done in esac time ! { } exec", a, " ")
+      for (i in a) kw[a[i]] = 1
+      split("sudo exec env nohup setsid xargs timeout nice ionice stdbuf systemd-run uwsm-app run0 chrt flock", a, " ")
+      for (i in a) wrap[a[i]] = 1
+    }
+    { L[NR] = $0 }
+    END {
+      if (label ~ /\.qml$/) {
+        for (ln = 1; ln <= NR; ln++) {
+          s = L[ln]
+          while (match(s, /(command|execDetached|exec|run|spawn)[A-Za-z]*[:(][ \t]*\[[ \t]*"[^"]+"/)) {
+            w = substr(s, RSTART, RLENGTH)
+            s = substr(s, RSTART + RLENGTH)
+            sub(/^[^"]*"/, "", w); sub(/"$/, "", w)
+            emit(w, 0)
+          }
+        }
+      } else {
+        if (L[1] ~ /^#!/) {
+          n = split(L[1], p, /[ \t]+/)
+          prog = p[1]; sub(/^#!/, "", prog)
+          if (prog ~ /env$/) for (j = 2; j <= n; j++) if (p[j] !~ /^-/) { prog = p[j]; break }
+          sub(/.*\//, "", prog)
+          if (prog !~ /^(bash|sh|dash)$/) { emit(prog, 0); ln = NR + 1 }
+        }
+        for (ln = 1; ln <= NR && !(prog !~ /^(bash|sh|dash)$/ && prog != ""); ln++)
+          if (match(L[ln], /^[ \t]*(function[ \t]+[A-Za-z_][A-Za-z0-9_.-]*|[A-Za-z_][A-Za-z0-9_.-]*[ \t]*\(\))/)) {
+            w = substr(L[ln], RSTART, RLENGTH)
+            sub(/^[ \t]*(function[ \t]+)?/, "", w); sub(/[ \t]*\(\)$/, "", w)
+            fn[w] = 1
+          }
+        for (ln = 1; ln <= NR && !(prog !~ /^(bash|sh|dash)$/ && prog != ""); ln++) {
+          v = L[ln]
+          while (match(v, /(^|[ \t;|&({])[A-Za-z_][A-Za-z0-9_]*\+?=/)) {
+            w = substr(v, RSTART, RLENGTH); gsub(/[ \t;|&({+=]/, "", w); fn[w] = 1
+            v = substr(v, RSTART + RLENGTH)
+          }
+        }
+        hd = ""; inq = ""; inarr = 0
+        for (ln = 1; ln <= NR && !(prog !~ /^(bash|sh|dash)$/ && prog != ""); ln++) {
+          line = L[ln]
+          while (inq == "" && line ~ /\\$/ && ln < NR) { sub(/\\$/, " ", line); line = line L[++ln] }
+          if (hd != "") { t = line; sub(/^[ \t]+/, "", t); if (t == hd) hd = ""; continue }
+          newhd = ""
+          if (inq == "" && match(line, "<<-?[ \t]*[\"" sq "\\\\]?[A-Za-z_][A-Za-z0-9_]*")) {
+            newhd = substr(line, RSTART, RLENGTH)
+            sub(/^<<-?[ \t]*/, "", newhd); gsub("[\"" sq "\\\\]", "", newhd)
+          }
+          code = ""; nn = 0; len = length(line)
+          for (i = 1; i <= len; i++) {
+            c = substr(line, i, 1)
+            if (inq == "\"") {
+              if (c == "\\") i++
+              else if (c == "\"") { inq = ""; code = code "_q" }
+              else if (c == "$" && substr(line, i + 1, 1) == "(" && substr(line, i + 2, 1) != "(") {
+                rest = substr(line, i + 2)
+                if (match(rest, /^[ \t]*[A-Za-z][A-Za-z0-9._+-]*/)) { w = substr(rest, RSTART, RLENGTH); gsub(/[ \t]/, "", w); nest[++nn] = w }
+              }
+            } else if (inq == sq) {
+              if (c == sq) { inq = ""; code = code "_q" }
+            } else if (c == "\\") { code = code "_"; i++ }
+            else if (c == "\"" || c == sq) inq = c
+            else if (c == "#" && (i == 1 || substr(line, i - 1, 1) ~ /[ \t;&|(]/)) break
+            else code = code c
+          }
+          for (i = 1; i <= nn; i++) emit(nest[i], 0)
+          if (newhd != "") hd = newhd
+          if (inarr) { if (code ~ /\)/) inarr = 0; continue }
+          gsub(/\$\(\([^)]*\)\)/, "_n", code)
+          gsub(/\(\([^)]*\)\)/, "_n", code)
+          while (match(code, /\[\[[ \t][^]]*[ \t]\]\]/)) code = substr(code, 1, RSTART - 1) "_t" substr(code, RSTART + RLENGTH)
+          while (match(code, /(^|[ \t;&|])\[[ \t][^]]*[ \t]\]/)) code = substr(code, 1, RSTART - 1) " _t" substr(code, RSTART + RLENGTH)
+          gsub(/\$\{[^}]*\}/, "_v", code)
+          gsub(/[A-Za-z_][A-Za-z0-9_]*\+?=\([^)]*\)/, "a=_v", code)
+          if (code ~ /=\([^)]*$/) inarr = 1
+          sub(/^[ \t]*[^ \t()]+([ \t]*\|[ \t]*[^ \t()|]+)*[ \t]*\)/, "", code)
+          gsub(/\|\||&&|[|;&()`]/, "\n", code)
+          m = split(code, seg, "\n")
+          for (i = 1; i <= m; i++) proc(seg[i])
+        }
+      }
+      for (w in seen) printf "%s\t%d\n", w, (w in gd) ? 1 : 0
+    }' | sort -u
+}
+
+# <root>: "<cmd>\t<guarded>\t<file>" for every bin and shell script/QML under an
+# upstream tree.
+audit_tree() {
+  local root=$1 f
+  while IFS= read -r f; do
+    ext_cmds "$f" <"$root/$f" | awk -F'\t' -v f="$f" '{ print $1 "\t" $2 "\t" f }'
+  done < <(cd "$root" && find bin shell -type f \( -path 'bin/*' -o -name '*.sh' -o -name '*.qml' \) | sort)
+}
+
+# stdin: "<cmd>\t<guarded>\t<file>"; stdout: one "<cmd>\t<all uses guarded
+# 0|1>\t<files>" line per command that is not on this machine.
+missing_deps() {
+  local cmd g file
+  while IFS=$'\t' read -r cmd g file; do
+    command -v "$cmd" >/dev/null 2>&1 && continue
+    printf '%s\t%s\t%s\n' "$cmd" "$g" "$file"
+  done | sort -t$'\t' -k1,1 -k3,3 | awk -F'\t' '
+    function out() { printf "%s\t%d\t%s\n", c, gd, fl }
+    $1 != c { if (c != "") out(); c = $1; gd = 1; fl = "" }
+    { if ($2 == 0) gd = 0; fl = fl (fl == "" ? "" : ", ") $3 }
+    END { if (c != "") out() }'
+}
+
+# "<cmd>\t<guarded>\t<files>" lines -> markdown list.
+deps_markdown() {
+  sort -t$'\t' -k2,2n -k1,1 | awk -F'\t' '{ printf "- `%s` (%s): %s\n", $1, ($2 ? "guarded" : "UNGUARDED"), $3 }'
+}
+
+# Commands that bins and shell scripts added or changed between the pins start
+# using (new relative to the old version of the same file) and this machine
+# lacks. Informational only: sets C_DEPS / C_DEPS_UNG, writes $T/deps.md.
+sec_deps() {
+  local st path out=$T/deps.md
+  : >"$T/deps.raw"
+  while IFS=$'\t' read -r st path; do
+    [[ $st == D ]] && continue
+    [[ $path == bin/* || $path == shell/*.sh || $path == shell/*.qml ]] || continue
+    if [[ $st == A ]]; then
+      : >"$T/deps.old"
+    else
+      G cat-file blob "$OLD:$path" 2>/dev/null | ext_cmds "$path" | cut -f1 >"$T/deps.old" || true
+    fi
+    G cat-file blob "$NEW:$path" | ext_cmds "$path" |
+      awk -F'\t' -v f="$path" 'FILENAME == ARGV[1] { old[$1]; next } !($1 in old) { print $1 "\t" $2 "\t" f }' "$T/deps.old" - \
+        >>"$T/deps.raw"
+  done <"$T/ns"
+  missing_deps <"$T/deps.raw" >"$T/deps.tsv"
+  C_DEPS=$(grep -c . "$T/deps.tsv" || true)
+  C_DEPS_UNG=$(awk -F'\t' '$2 == 0 { n++ } END { print n + 0 }' "$T/deps.tsv")
+  if [[ -s $T/deps.tsv ]]; then
+    deps_markdown <"$T/deps.tsv" >"$out"
+  else
+    echo "- none: every command the added or changed scripts use is on this machine" >"$out"
+  fi
+}
+
+# Whole-tree audit at the applied pin; the hidden --audit-deps mode.
+audit_deps() {
+  local root=$LANDING
+  [[ -d $root/bin ]] || die "$root has no bin/: apply the pinned external first (chezmoi apply $root)"
+  audit_tree "$root" | missing_deps
 }
 
 # ------------------------------------------------------------- report builders
@@ -382,6 +591,7 @@ build_report() {
   sec_shell
   sec_migrations
   sec_overrides
+  sec_deps
   {
     echo "# Upstream sync: $(short "$OLD") -> $(short "$NEW")"
     echo
@@ -389,6 +599,13 @@ build_report() {
     echo "- requested ref: ${ref:-default branch HEAD}"
     echo "- old pin: \`$OLD\`"
     echo "- new pin: \`$NEW\`"
+    echo
+    echo "## New external commands missing on this machine (informational)"
+    echo "Commands the added or changed bins/shell scripts start using that are not on PATH here;"
+    echo "UNGUARDED = no \`command -v\` / \`omarchy-cmd-present\` probe in the same file, so the feature fails silently."
+    echo "Find the package (\`pacman -F\`, \`yay -Ss\`), add it to .chezmoidata/packages.toml, or drop the feature."
+    echo
+    cat "$T/deps.md"
     echo
     echo "## Summary"
     summary_lines
@@ -411,6 +628,7 @@ summary_lines() {
   echo "- themed templates: +$C_TPL_A / -$C_TPL_D / ~$C_TPL_M changed"
   echo "- shell plugins changed: $C_SHELL_PLUGINS plugins ($C_SHELL_FILES files under shell/)"
   echo "- migrations added: $C_MIG ($C_MIG_FLAG touching overlay-owned paths)"
+  echo "- new external commands missing here: $C_DEPS ($C_DEPS_UNG unguarded)"
   echo "- overrides: $C_OV tracked, $C_OV_CHANGED drifted, $C_OV_REMOVED removed upstream"
 }
 
@@ -638,11 +856,12 @@ cleanup() {
 }
 
 main() {
-  local ref="" accept="" arg
+  local ref="" accept="" audit=0 arg
   while (($#)); do
     arg=$1
     case $arg in
       --dry-run) DRY_RUN=1 ;;
+      --audit-deps) audit=1 ;;
       --accept-override)
         (($# >= 2)) || die "--accept-override needs a path"
         accept=$2
@@ -662,6 +881,13 @@ main() {
   [[ -d $SRC ]] || die "chezmoi source dir not found: $SRC"
   [[ -f $SRC/$PIN_REL ]] || die "pin file missing: $SRC/$PIN_REL"
   [[ -f $SRC/$EXT_REL ]] || die "external template missing: $SRC/$EXT_REL"
+
+  if ((audit)); then
+    ((DRY_RUN == 0 && ${#ref} == 0)) && [[ -z $accept ]] || die "--audit-deps takes no other arguments"
+    LANDING=$HOME/$(pin_landing "$SRC/$PIN_REL")
+    audit_deps | deps_markdown
+    return 0
+  fi
 
   if [[ -n $accept ]]; then
     ((DRY_RUN == 0 && ${#ref} == 0)) || die "--accept-override takes no other arguments"

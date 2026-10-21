@@ -27,7 +27,7 @@ setup() {
 make_upstream() {
   git init -q -b main "$UP"
   mkdir -p "$UP"/{bin,default/hypr/bindings,default/themed,themes/t1,shell/plugins/p1,migrations,docs}
-  printf '#!/bin/bash\n# omarchy:summary=Old thing\necho a\n' >"$UP/bin/omarchy-a"
+  printf '#!/bin/bash\n# omarchy:summary=Old thing\necho a\nzzold-tool\n' >"$UP/bin/omarchy-a"
   printf '#!/bin/bash\n# omarchy:summary=Overridden\necho ov\n' >"$UP/bin/omarchy-ov"
   printf '#!/bin/bash\n# omarchy:summary=Doomed\n' >"$UP/bin/omarchy-gone"
   printf 'o.bind("SUPER + A", "A", f)\n' >"$UP/default/hypr/bindings/x.lua"
@@ -39,10 +39,10 @@ make_upstream() {
   git -C "$UP" add -A && git -C "$UP" commit -q -m c1
   C1=$(git -C "$UP" rev-parse HEAD)
 
-  printf '#!/bin/bash\n# omarchy:summary=Old thing\necho a2\n' >"$UP/bin/omarchy-a"
+  printf '#!/bin/bash\n# omarchy:summary=Old thing\necho a2\nzzold-tool\nzzfake-chg --now\n' >"$UP/bin/omarchy-a"
   printf '#!/bin/bash\n# omarchy:summary=Overridden\necho ov-new\n' >"$UP/bin/omarchy-ov"
   git -C "$UP" rm -q bin/omarchy-gone
-  printf '#!/bin/bash\n# omarchy:summary=Brand new\n' >"$UP/bin/omarchy-new"
+  printf '#!/bin/bash\n# omarchy:summary=Brand new\nzzfake-tool --go\nomarchy-cmd-present zzfake-opt && zzfake-opt\nls\n' >"$UP/bin/omarchy-new"
   printf 'o.bind("SUPER + A", "A", f)\no.bind("SUPER + B", "B", g)\n' >"$UP/default/hypr/bindings/x.lua"
   echo y >"$UP/default/themed/foo.tpl"
   echo y >"$UP/default/themed/bar.tpl"
@@ -306,4 +306,113 @@ fn() { bash -c 'set -euo pipefail; source "$1"; shift; "$@"' _ "$SCRIPT" "$@"; }
 @test "usage: unknown flag exits 2" {
   run "$SCRIPT" --bogus
   [ "$status" -eq 2 ]
+}
+
+# ------------------------------------------------- external command audit ---
+
+@test "ext_cmds: first words of pipes and lists; builtins, omarchy-*, vars, quotes, comments excluded" {
+  run fn ext_cmds bin/x <<'EOF'
+#!/bin/bash
+# zzcomment-tool is only mentioned here
+set -euo pipefail
+echo "zzquoted-tool in a string"
+cd /tmp && zzone-tool --flag | zztwo-tool; zzthree-tool
+omarchy-whatever arg
+"$VAR" arg
+if zzcond-tool; then zzthen-tool; fi
+x=$(zzsub-tool arg)
+printf '%s' "$(zzdq-tool)"
+EOF
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(printf 'zzcond-tool\t0\nzzdq-tool\t0\nzzone-tool\t0\nzzsub-tool\t0\nzzthen-tool\t0\nzzthree-tool\t0\nzztwo-tool\t0')" ]
+}
+
+@test "ext_cmds: functions defined in the file, assigned names and heredoc bodies are excluded" {
+  run fn ext_cmds bin/x <<'EOF'
+#!/bin/bash
+zzhelper() { zzreal-tool; }
+function zzother { :; }
+zzhelper
+zzother
+zzvar=1
+zzvar
+: <<TXT
+zzprose-tool says hi
+TXT
+: <<-'TXT'
+	zzprose2-tool
+	TXT
+EOF
+  [ "$output" = "$(printf 'zzreal-tool\t0')" ]
+}
+
+@test "ext_cmds: exec, sudo, systemd-run and uwsm-app wrappers resolve to the wrapped command" {
+  run fn ext_cmds bin/x <<'EOF'
+#!/bin/bash
+exec zzexec-tool "$1"
+sudo -n zzsudo-tool
+systemd-run --user --quiet --collect zzrun-tool --headless
+uwsm-app -- zzuwsm-tool
+timeout 5 zztimeout-tool
+EOF
+  [ "$output" = "$(printf 'zzexec-tool\t0\nzzrun-tool\t0\nzzsudo-tool\t0\nzztimeout-tool\t0\nzzuwsm-tool\t0')" ]
+}
+
+@test "ext_cmds: command -v and omarchy-cmd-present/missing mark commands as guarded" {
+  run fn ext_cmds bin/x <<'EOF'
+#!/bin/bash
+command -v zzopt-one >/dev/null || exit 0
+omarchy-cmd-present zzopt-two zzopt-three && true
+if omarchy-cmd-missing zzopt-four; then :; fi
+zzopt-one --go
+zzhard-tool
+EOF
+  [ "$output" = "$(printf 'zzhard-tool\t0\nzzopt-four\t1\nzzopt-one\t1\nzzopt-three\t1\nzzopt-two\t1')" ]
+}
+
+@test "ext_cmds: non-shell shebangs yield the interpreter only; qml yields spawned commands" {
+  run fn ext_cmds bin/x <<'EOF'
+#!/usr/bin/env zzruby
+puts `zzinner-tool`
+EOF
+  [ "$output" = "$(printf 'zzruby\t0')" ]
+  run fn ext_cmds shell/Svc.qml <<'EOF'
+Process { command: ["zzqml-tool", "--x"] }
+Quickshell.execDetached(["zzdetached-tool"])
+Process { command: ["omarchy-shell", "ping"] }
+EOF
+  [ "$output" = "$(printf 'zzdetached-tool\t0\nzzqml-tool\t0')" ]
+}
+
+@test "missing_deps: keeps only absent commands, merges files, guarded only when every use is" {
+  run bash -c 'source "$1"; printf "%s\n" "ls\t0\tbin/a" "zzm-tool\t1\tbin/b" "zzm-tool\t0\tbin/c" "zzn-tool\t1\tbin/d" | sed "s/\\\\t/\t/g" | missing_deps' _ "$SCRIPT"
+  [ "$output" = "$(printf 'zzm-tool\t0\tbin/b, bin/c\nzzn-tool\t1\tbin/d')" ]
+}
+
+@test "dry-run: lists new external commands missing here, near the top, without failing" {
+  run "$SCRIPT" --dry-run "$C2"
+  [ "$status" -eq 0 ]
+  [[ $output == *"## New external commands missing on this machine"* ]]
+  [[ $output == *'`zzfake-tool` (UNGUARDED): bin/omarchy-new'* ]]
+  [[ $output == *'`zzfake-chg` (UNGUARDED): bin/omarchy-a'* ]]
+  [[ $output == *'`zzfake-opt` (guarded): bin/omarchy-new'* ]]
+  [[ $output != *"zzold-tool"* ]]
+  [[ $output != *'`ls`'* ]]
+  [[ $output == *"new external commands missing here: 3 (2 unguarded)"* ]]
+  [[ ${output%%"## Summary"*} == *"zzfake-tool"* ]]
+  [[ ${output%%"## Bins"*} == *"zzfake-tool"* ]]
+}
+
+@test "audit-deps: scans the applied tree offline and lists missing commands" {
+  mkdir -p "$HOME/.local/share/omarchy-upstream/bin" "$HOME/.local/share/omarchy-upstream/shell"
+  printf '#!/bin/bash\nzzaudit-tool\nls\n' >"$HOME/.local/share/omarchy-upstream/bin/omarchy-x"
+  printf 'Process { command: ["zzaudit-qml"] }\n' >"$HOME/.local/share/omarchy-upstream/shell/S.qml"
+  run "$SCRIPT" --audit-deps
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(printf '%s\n' '- `zzaudit-qml` (UNGUARDED): shell/S.qml' '- `zzaudit-tool` (UNGUARDED): bin/omarchy-x')" ]
+}
+
+@test "audit-deps: refuses extra arguments" {
+  run "$SCRIPT" --audit-deps --dry-run
+  [ "$status" -ne 0 ]
 }
