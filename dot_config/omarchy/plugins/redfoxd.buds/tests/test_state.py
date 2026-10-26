@@ -77,5 +77,36 @@ class BackoffTest(unittest.TestCase):
         self.assertEqual([bs.backoff(i) for i in range(6)], [2, 5, 10, 30, 30, 30])
 
 
+def dev(name, addr, connected=False, paired=True):
+    return {"org.bluez.Device1": {"Name": name, "Address": addr,
+                                  "Connected": connected, "Paired": paired}}
+
+
+class PickDeviceTest(unittest.TestCase):
+    MOUSE = ("/org/bluez/hci0/dev_A", dev("R1mouse1", "AA:AA:AA:AA:AA:AA", connected=True))
+    BUDS = ("/org/bluez/hci0/dev_C", dev("Buds3 Pro", "C4:77:64:28:71:16"))
+
+    def test_paired_buds_are_picked_when_none_connected(self):
+        found = bs.pick_device(dict([self.MOUSE, self.BUDS]), "")
+        self.assertEqual(found, ("/org/bluez/hci0/dev_C", "Buds3 Pro", "C4:77:64:28:71:16", False))
+
+    def test_connected_buds_win_over_paired_ones(self):
+        live = ("/org/bluez/hci0/dev_B", dev("Galaxy Buds2", "BB:BB:BB:BB:BB:BB", connected=True))
+        found = bs.pick_device(dict([self.BUDS, live]), "")
+        self.assertEqual(found[0], "/org/bluez/hci0/dev_B")
+        self.assertTrue(found[3])
+
+    def test_unpaired_buds_are_ignored(self):
+        stranger = ("/org/bluez/hci0/dev_D", dev("Buds FE", "DD:DD:DD:DD:DD:DD", paired=False))
+        self.assertIsNone(bs.pick_device(dict([self.MOUSE, stranger]), ""))
+
+    def test_address_matches_case_insensitively(self):
+        found = bs.pick_device(dict([self.MOUSE, self.BUDS]), "c4:77:64:28:71:16")
+        self.assertEqual(found[0], "/org/bluez/hci0/dev_C")
+
+    def test_unknown_address_finds_nothing(self):
+        self.assertIsNone(bs.pick_device(dict([self.BUDS]), "00:00:00:00:00:00"))
+
+
 if __name__ == "__main__":
     unittest.main()

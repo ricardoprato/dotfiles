@@ -2,7 +2,7 @@
   "buds.title": "Galaxy Buds",
   "buds.connect": "Conectar",
   "buds.disconnected": "Buds no conectados",
-  "buds.disconnected.hint": "Conectá los buds desde los ajustes de Bluetooth y presioná Conectar.",
+  "buds.disconnected.hint": "Sacá los buds del estuche y presioná Conectar.",
   "buds.error.device_not_found": "No se encontraron Galaxy Buds conectados",
   "buds.error.bluez_unavailable": "El servicio de Bluetooth no está disponible",
   "buds.error.connect_failed": "No se pudo conectar con los buds",

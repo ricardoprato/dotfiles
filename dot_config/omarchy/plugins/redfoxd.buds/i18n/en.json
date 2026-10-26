@@ -2,7 +2,7 @@
   "buds.title": "Galaxy Buds",
   "buds.connect": "Connect",
   "buds.disconnected": "Buds not connected",
-  "buds.disconnected.hint": "Connect the buds in Bluetooth settings, then press Connect.",
+  "buds.disconnected.hint": "Take the buds out of the case, then press Connect.",
   "buds.error.device_not_found": "No connected Galaxy Buds found",
   "buds.error.bluez_unavailable": "Bluetooth service is not available",
   "buds.error.connect_failed": "Could not connect to the buds",

@@ -13,12 +13,13 @@ Battery and controls for Samsung Galaxy Buds (written against the Buds3 Pro).
 ## Requirements
 
 - BlueZ, `python3` with `gi` (PyGObject) at `/usr/bin/python3`. No pip packages.
-- The buds paired and connected in Bluetooth settings.
+- The buds paired in Bluetooth settings (connecting them is optional).
 
 ## Settings
 
-- `address`: MAC of the buds. Empty means the first connected device whose
-  name contains "Buds".
+- `address`: MAC of the buds. Empty means the first device whose name contains
+  "Buds", preferring a connected one; a paired but disconnected pair is
+  connected on demand.
 - `hideWhenDisconnected`: hide the bar button while the buds are away.
 
 ## Limits
