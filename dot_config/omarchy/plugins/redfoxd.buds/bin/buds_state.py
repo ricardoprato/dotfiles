@@ -40,7 +40,7 @@ def pick_device(objects, address):
     """Choose the buds among BlueZ managed objects: (path, name, address, connected) or None.
 
     With an address, that device. Without one, connected buds first, then paired
-    buds, so a disconnected pair can still be brought up with Device1.Connect.
+    buds, so a disconnected pair can still be brought up with ConnectProfile.
     """
     candidates = []
     for path, ifaces in sorted(objects.items()):
