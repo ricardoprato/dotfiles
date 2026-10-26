@@ -105,25 +105,13 @@ class Link:
         if device is None:
             self._fail("device_not_found")
             return False
-        path, name, address, connected = device
+        path, name, address, _connected = device
         self.device = (path, name, address)
-        if connected:
-            self._connect_profile(token)
-        else:
-            self.bus.call(BLUEZ, path, "org.bluez.Device1", "Connect", None, None,
-                          Gio.DBusCallFlags.NONE, CONNECT_TIMEOUT * 1000, None,
-                          self._on_connect_done, token)
-        return False
-
-    def _on_connect_done(self, bus, result, token):
-        if token != self.token:
-            return
-        try:
-            bus.call_finish(result)
-        except GLib.Error:
-            self._fail("connect_failed")
-            return
+        # No Device1.Connect: it follows the last-used bearer, and dual-mode
+        # buds last used over LE Audio come up on LE, which has no SPP.
+        # ConnectProfile on the SPP UUID brings up BR/EDR itself.
         self._connect_profile(token)
+        return False
 
     def _find_device(self):
         reply = self.bus.call_sync(
