@@ -129,19 +129,7 @@ class Link:
         reply = self.bus.call_sync(
             BLUEZ, "/", "org.freedesktop.DBus.ObjectManager", "GetManagedObjects", None,
             GLib.VariantType("(a{oa{sa{sv}}})"), Gio.DBusCallFlags.NONE, 5000, None)
-        for path, ifaces in sorted(reply.unpack()[0].items()):
-            dev = ifaces.get("org.bluez.Device1")
-            if not dev:
-                continue
-            name = dev.get("Name") or dev.get("Alias") or ""
-            addr = dev.get("Address", "")
-            if self.address:
-                if addr.upper() != self.address.upper():
-                    continue
-            elif not (dev.get("Connected") and "buds" in name.lower()):
-                continue
-            return path, name, addr, bool(dev.get("Connected"))
-        return None
+        return st.pick_device(reply.unpack()[0], self.address)
 
     def _connect_profile(self, token):
         options = {"Role": GLib.Variant("s", "client"), "Name": GLib.Variant("s", "omarchy-buds")}

@@ -36,6 +36,29 @@ def merge(state, fragment):
     return changed
 
 
+def pick_device(objects, address):
+    """Choose the buds among BlueZ managed objects: (path, name, address, connected) or None.
+
+    With an address, that device. Without one, connected buds first, then paired
+    buds, so a disconnected pair can still be brought up with Device1.Connect.
+    """
+    candidates = []
+    for path, ifaces in sorted(objects.items()):
+        dev = ifaces.get("org.bluez.Device1")
+        if not dev:
+            continue
+        name = dev.get("Name") or dev.get("Alias") or ""
+        addr = dev.get("Address", "")
+        connected = bool(dev.get("Connected"))
+        if address:
+            if addr.upper() == address.upper():
+                return path, name, addr, connected
+        elif "buds" in name.lower() and (connected or dev.get("Paired")):
+            candidates.append((path, name, addr, connected))
+    connected_first = sorted(candidates, key=lambda c: not c[3])
+    return connected_first[0] if connected_first else None
+
+
 def dumps(state):
     return json.dumps(state, separators=(",", ":"))
 

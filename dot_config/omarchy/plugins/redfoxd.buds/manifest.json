@@ -28,7 +28,7 @@
         "type": "string",
         "label": "Bluetooth address",
         "defaultValue": "",
-        "description": "MAC address of the buds. Leave empty to use the first connected device whose name contains Buds."
+        "description": "MAC address of the buds. Leave empty to use the first paired device whose name contains Buds, preferring a connected one."
       },
       {
         "key": "hideWhenDisconnected",
