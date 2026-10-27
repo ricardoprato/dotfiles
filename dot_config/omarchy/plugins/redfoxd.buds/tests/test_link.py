@@ -43,8 +43,17 @@ class FakeBus:
             return FakeReply(({PATH: {"org.bluez.Device1": dev}},))
         return None
 
-    def call(self, name, path, iface, method, params, *args):
-        self.calls.append(method)
+    def call(self, name, path, iface, method, params, reply_type, flags, timeout,
+             cancellable, callback, user_data):
+        if method == "ConnectProfile":
+            self.calls.append((method, params.unpack()[0]))
+        else:
+            self.calls.append(method)
+        if callback:
+            callback(self, None, user_data)
+
+    def call_finish(self, result):
+        return None
 
 
 class CycleTest(unittest.TestCase):
@@ -56,17 +65,20 @@ class CycleTest(unittest.TestCase):
         link._clear("timeout")
         return bus.calls
 
-    def test_disconnected_buds_connect_through_spp_profile(self):
+    def assert_audio_then_spp(self, calls):
         # Device1.Connect follows the last-used bearer (LE for these buds),
-        # which never carries SPP; ConnectProfile brings up BR/EDR.
-        calls = self.cycle(connected=False)
+        # which never carries SPP. A2DP first brings up BR/EDR with an audio
+        # profile on it; the buds drop a BR/EDR link that carries SPP alone
+        # after about 30 s.
         self.assertNotIn("Connect", calls)
-        self.assertIn("ConnectProfile", calls)
+        profiles = [c[1] for c in calls if isinstance(c, tuple)]
+        self.assertEqual(profiles, [buds.A2DP_SINK_UUID, buds.SPP_UUID])
 
-    def test_connected_buds_connect_through_spp_profile(self):
-        calls = self.cycle(connected=True)
-        self.assertNotIn("Connect", calls)
-        self.assertIn("ConnectProfile", calls)
+    def test_disconnected_buds_connect_audio_then_spp(self):
+        self.assert_audio_then_spp(self.cycle(connected=False))
+
+    def test_connected_buds_connect_audio_then_spp(self):
+        self.assert_audio_then_spp(self.cycle(connected=True))
 
 
 if __name__ == "__main__":
