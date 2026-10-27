@@ -14,6 +14,9 @@ Battery and controls for Samsung Galaxy Buds (written against the Buds3 Pro).
 
 - BlueZ, `python3` with `gi` (PyGObject) at `/usr/bin/python3`. No pip packages.
 - The buds paired in Bluetooth settings (connecting them is optional).
+  The plugin connects A2DP before its control channel: the buds drop a
+  Bluetooth link that carries the control channel alone after about 30 s, so
+  connecting from the plugin also makes the buds an audio output.
 
 ## Settings
 
