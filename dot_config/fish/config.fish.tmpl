@@ -7,6 +7,18 @@ if status is-interactive
     set -gx STARSHIP_CONFIG ~/.local/state/omarchy/current/theme/starship.toml
     starship init fish | source
     atuin init fish | source
+    # fish_vi_key_bindings makes atuin's plain `bind "?"` land in the *normal*
+    # keymap only, so it does nothing while typing. Bind it in insert mode too,
+    # falling back to a literal "?" when the buffer isn't empty (the atuin
+    # handler only inserts "?" for non-vi key bindings).
+    function _atuin_ai_question_mark_insert
+        if test -z (commandline -b)
+            _atuin_ai_question_mark
+        else
+            commandline -i "?"
+        end
+    end
+    bind -M insert "?" _atuin_ai_question_mark_insert
     eval "$(direnv hook fish)"
 end
 
