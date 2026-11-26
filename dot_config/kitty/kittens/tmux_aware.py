@@ -12,7 +12,7 @@ alt+<single char> (encoded as ESC + char).
 
 from kittens.tui.handler import result_handler
 
-PASSTHROUGH_PROCESSES = frozenset({"tmux"})
+PASSTHROUGH_PROCESSES = frozenset({"tmux", "ssh"})
 
 
 def _key_bytes(key: str):
