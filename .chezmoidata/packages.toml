@@ -76,7 +76,9 @@ pacman = [
   "zoxide",
   "zsh",
 ]
-aur = []
+aur = [
+  "sesh-bin",
+]
 
 # --------------------------------------------------------------------------
 # desktop — native machines only: Hyprland/Wayland session, GUI apps, fonts,
