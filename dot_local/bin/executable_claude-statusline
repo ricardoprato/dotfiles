@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Claude Code status line: model, folder, git branch, context usage and the
+# 5-hour rate limit. Reads the session JSON on stdin (see
+# https://code.claude.com/docs/en/statusline). Glyphs follow the nvim
+# statusline: plain text segments, ↑/↓ for ahead/behind. Colors are the
+# terminal's ANSI palette, so they follow the active omarchy theme.
+
+set -euo pipefail
+
+input=$(cat)
+
+IFS=$'\x1f' read -r model effort dir ctx rate5h < <(jq -r '[
+  .model.display_name // "?",
+  .effort.level // "",
+  .workspace.current_dir // .cwd // "",
+  (.context_window.used_percentage // 0 | floor),
+  (.rate_limits.five_hour.used_percentage // "" | if . == "" then "" else floor end)
+] | map(tostring) | join("\u001f")' <<<"$input")
+
+reset=$'\e[0m' dim=$'\e[2m' blue=$'\e[34m' magenta=$'\e[35m' cyan=$'\e[36m'
+green=$'\e[32m' yellow=$'\e[33m' red=$'\e[31m'
+sep=" ${dim}│${reset} "
+
+level_color() {
+  if (($1 >= 80)); then printf '%s' "$red"
+  elif (($1 >= 50)); then printf '%s' "$yellow"
+  else printf '%s' "$green"; fi
+}
+
+out="${magenta}󰚩 ${model}${reset}"
+[[ -n $effort ]] && out+=" ${dim}${effort}${reset}"
+
+out+="${sep}${blue}󰉋 ${dir##*/}${reset}"
+
+if branch=$(git -C "$dir" --no-optional-locks symbolic-ref --short -q HEAD 2>/dev/null ||
+  git -C "$dir" --no-optional-locks rev-parse --short HEAD 2>/dev/null); then
+  git_part="${cyan} ${branch}${reset}"
+  if counts=$(git -C "$dir" --no-optional-locks rev-list --left-right --count '@{u}...HEAD' 2>/dev/null); then
+    read -r behind ahead <<<"$counts"
+    ((ahead > 0)) && git_part+=" ↑${ahead}"
+    ((behind > 0)) && git_part+=" ↓${behind}"
+  fi
+  [[ -n $(git -C "$dir" --no-optional-locks status --porcelain -uno 2>/dev/null | head -1) ]] &&
+    git_part+=" ${yellow}●${reset}"
+  out+="${sep}${git_part}"
+fi
+
+filled=$((ctx / 10))
+bar=""
+for ((i = 0; i < 10; i++)); do
+  if ((i < filled)); then bar+="▰"; else bar+="▱"; fi
+done
+out+="${sep}$(level_color "$ctx")${bar} ${ctx}%${reset}"
+
+[[ -n $rate5h ]] && out+="${sep}$(level_color "$rate5h")5h ${rate5h}%${reset}"
+
+printf '%s\n' "$out"
